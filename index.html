@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>圖片搜尋與單詞卡</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="search-section">
+            <input type="text" id="searchInput" placeholder="請輸入搜尋關鍵字">
+            <button id="searchButton">搜尋圖片</button>
+        </div>
+        
+        <div id="searchResults" class="image-grid"></div>
+
+        <div class="flashcards-section">
+            <h2>單詞卡</h2>
+            <div id="flashcards"></div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
+    <script src="main.js"></script>
+</body>
+</html> 

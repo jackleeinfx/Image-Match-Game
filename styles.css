@@ -1,0 +1,69 @@
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.search-section {
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+#searchInput {
+    padding: 10px;
+    width: 300px;
+    margin-right: 10px;
+}
+
+#searchButton {
+    padding: 10px 20px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+
+.image-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.image-item {
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.image-item:hover {
+    transform: scale(1.05);
+}
+
+.image-item img {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+}
+
+.flashcards-section {
+    margin-top: 40px;
+}
+
+#flashcards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 20px;
+}
+
+.flashcard {
+    border: 1px solid #ddd;
+    padding: 15px;
+    text-align: center;
+}
+
+.flashcard img {
+    max-width: 100%;
+    height: 200px;
+    object-fit: cover;
+    margin-bottom: 10px;
+} 
