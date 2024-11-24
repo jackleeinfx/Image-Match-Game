@@ -149,6 +149,7 @@
     border-radius: 5px;
     box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     z-index: 1000;
+    transition: transform 0.3s ease;
 }
 
 .settings label {
@@ -261,4 +262,46 @@
 
 .flashcard {
     transition: all 0.3s ease;
+}
+
+/* 折疊按鈕樣式 */
+.toggle-button {
+    position: absolute;
+    top: 5px;
+    left: -30px;
+    width: 30px;
+    height: 30px;
+    background-color: #f8f8f8;
+    border: none;
+    border-radius: 5px 0 0 5px;
+    cursor: pointer;
+    box-shadow: -2px 0 5px rgba(0,0,0,0.1);
+    font-size: 20px;
+    color: #666;
+    transition: background-color 0.3s;
+}
+
+.toggle-button:hover {
+    background-color: #e0e0e0;
+}
+
+/* 設定內容區域 */
+.settings-content {
+    transition: opacity 0.3s, transform 0.3s;
+}
+
+/* 折疊狀態 */
+.settings.collapsed {
+    transform: translateX(calc(100% - 30px));
+}
+
+.settings.collapsed .settings-content {
+    opacity: 0;
+    transform: translateX(20px);
+    pointer-events: none;
+}
+
+/* 調整其他相關樣式 */
+.settings.collapsed .toggle-button {
+    box-shadow: -2px 0 5px rgba(0,0,0,0.1);
 } 

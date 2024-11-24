@@ -216,6 +216,23 @@ document.addEventListener('DOMContentLoaded', () => {
     // 添加隨機排序按鈕事件
     const shuffleButton = document.getElementById('shuffleCards');
     shuffleButton.addEventListener('click', shuffleFlashcards);
+
+    // 添加設定面板折疊功能
+    const toggleButton = document.getElementById('toggleSettings');
+    const settings = document.querySelector('.settings');
+    
+    toggleButton.addEventListener('click', () => {
+        settings.classList.toggle('collapsed');
+        
+        // 保存折疊狀態
+        localStorage.setItem('settingsCollapsed', settings.classList.contains('collapsed'));
+    });
+
+    // 載入保存的折疊狀態
+    const savedCollapsed = localStorage.getItem('settingsCollapsed');
+    if (savedCollapsed === 'true') {
+        settings.classList.add('collapsed');
+    }
 });
 
 // 添加語音初始化函數
