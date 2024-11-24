@@ -234,36 +234,70 @@ document.addEventListener('DOMContentLoaded', () => {
     // 其他初始化代碼...
 });
 
-// 簡化語音初始化函數
+// 修改語音初始化函數
 function initSpeech() {
-    // 確保 ResponsiveVoice 已經載入
+    // 等待 ResponsiveVoice 完全載入
     if (window.responsiveVoice) {
         console.log('ResponsiveVoice 已載入');
         responsiveVoice.init();
+        
+        // 確認語音引擎狀態
+        console.log('ResponsiveVoice 狀態:', {
+            isInitialized: responsiveVoice.isInitialized(),
+            voiceSupport: responsiveVoice.voiceSupport()
+        });
     } else {
         console.error('ResponsiveVoice 未載入');
+        // 如果未載入，1秒後重試
+        setTimeout(initSpeech, 1000);
     }
 }
 
-// 簡化語音播放函數
+// 修改語音播放函數
 function speakWord(word) {
     if (!word) {
         console.error('沒有要播放的文字');
         return;
     }
 
-    if (window.responsiveVoice && responsiveVoice.voiceSupport()) {
-        console.log('使用 ResponsiveVoice 播放:', word);
-        responsiveVoice.speak(word, "US English Female", {
-            pitch: 1,
-            rate: 0.8,
-            volume: 1,
-            onend: () => console.log('ResponsiveVoice 播放完成')
-        });
-    } else {
-        console.error('ResponsiveVoice未載入或不支援');
+    // 確保 ResponsiveVoice 已載入
+    if (!window.responsiveVoice) {
+        console.error('ResponsiveVoice 未載入，重新初始化...');
+        initSpeech();
+        setTimeout(() => speakWord(word), 1000);
+        return;
     }
+
+    // 強制取消任何正在播放的語音
+    if (responsiveVoice.isPlaying()) {
+        responsiveVoice.cancel();
+    }
+
+    console.log('開始播放語音:', word);
+    
+    // 強制使用 ResponsiveVoice
+    responsiveVoice.speak(word, "US English Female", {
+        pitch: 1,
+        rate: 0.8,
+        volume: 1,
+        onstart: () => console.log('ResponsiveVoice 開始播放'),
+        onend: () => console.log('ResponsiveVoice 播放完成'),
+        onerror: (e) => console.error('ResponsiveVoice 播放錯誤:', e)
+    });
 }
+
+// 在文檔載入時初始化語音
+document.addEventListener('DOMContentLoaded', () => {
+    // 確保 ResponsiveVoice 完全載入後再初始化
+    if (window.responsiveVoice) {
+        initSpeech();
+    } else {
+        // 如果還沒載入，等待一下再試
+        setTimeout(initSpeech, 1000);
+    }
+    
+    // ... 其他初始化代碼 ...
+});
 
 // 修改 createFlashcard 函數，添加語音功能
 function createFlashcard(imageUrl, word, fileName) {
