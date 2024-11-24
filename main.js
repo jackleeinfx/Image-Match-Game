@@ -235,30 +235,82 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// 添加語音初始化函數
+// 修改語音初始化函數
 function initSpeech() {
-    // 等待語音列表載入
-    speechSynthesis.addEventListener('voiceschanged', () => {
+    // 檢查瀏覽器是否支援語音合成
+    if (!window.speechSynthesis) {
+        console.warn('此瀏覽器不支援語音合成');
+        return;
+    }
+
+    // 在 iOS 上需要在用戶交互時初始化語音
+    function initVoices() {
         const voices = speechSynthesis.getVoices();
-        // 尋找英語語音
-        speechVoice = voices.find(voice => 
-            voice.lang.includes('en') && voice.localService
-        ) || voices[0];
-        console.log('已選擇語音：', speechVoice.name);
-    });
+        if (voices.length > 0) {
+            // 優先選擇英語語音
+            speechVoice = voices.find(voice => 
+                voice.lang.includes('en')
+            ) || voices[0];
+            console.log('已選擇語音：', speechVoice.name);
+        } else {
+            console.warn('沒有可用的語音');
+        }
+    }
+
+    // 如果語音列表已經可用，直接初始化
+    if (speechSynthesis.getVoices().length > 0) {
+        initVoices();
+    }
+
+    // 監聽語音列表變化
+    speechSynthesis.addEventListener('voiceschanged', initVoices);
 }
 
-// 添加語音播放函數
+// 修改語音播放函數
 function speakWord(word) {
-    // 如果有正在播放的語音，先停止
+    // 檢查是否支援語音功能
+    if (!window.speechSynthesis || !word) {
+        console.warn('語音功能不可用或沒有文字');
+        return;
+    }
+
+    // 在 iOS 上需要先暫停再重新開始
     speechSynthesis.cancel();
 
-    if (word && speechVoice) {
-        const utterance = new SpeechSynthesisUtterance(word);
+    // 創建新的語音實例
+    const utterance = new SpeechSynthesisUtterance(word);
+    
+    // 如果有可用的語音，使用它
+    if (speechVoice) {
         utterance.voice = speechVoice;
-        utterance.rate = 0.8; // 語速稍慢
-        utterance.pitch = 1;
+    }
+
+    // 設置語音參數
+    utterance.rate = 0.8;  // 語速
+    utterance.pitch = 1;   // 音調
+    utterance.volume = 1;  // 音量
+    utterance.lang = 'en-US';  // 確保使用英語
+
+    // 添加錯誤處理
+    utterance.onerror = (event) => {
+        console.error('語音播放錯誤：', event);
+    };
+
+    // 在 iOS 上需要在用戶交互時播放
+    try {
         speechSynthesis.speak(utterance);
+        
+        // iOS 的特殊處理
+        if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
+            setTimeout(() => {
+                // 確保語音開始播放
+                if (speechSynthesis.paused) {
+                    speechSynthesis.resume();
+                }
+            }, 100);
+        }
+    } catch (error) {
+        console.error('語音播放失敗：', error);
     }
 }
 
@@ -296,8 +348,17 @@ function createFlashcard(imageUrl, word, fileName) {
     // 修改雙擊事件，添加語音播放
     card.addEventListener('dblclick', () => {
         card.classList.toggle('show-all');
-        // 播放單詞語音
-        speakWord(word);
+        
+        // 在 iOS 上，使用 touch 事件可能更可靠
+        if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
+            // 確保在用戶交互時播放
+            document.body.addEventListener('touchend', () => {
+                speakWord(word);
+            }, { once: true });
+        } else {
+            speakWord(word);
+        }
+
         setTimeout(() => {
             card.classList.remove('show-all');
         }, 3000);
