@@ -285,7 +285,7 @@
     background-color: #e0e0e0;
 }
 
-/* 設定���容區域 */
+/* 設定內容區域 */
 .settings-content {
     transition: opacity 0.3s, transform 0.3s;
 }
@@ -304,5 +304,4 @@
 /* 調整其他相關樣式 */
 .settings.collapsed .toggle-button {
     box-shadow: -2px 0 5px rgba(0,0,0,0.1);
-}
- 
+} 

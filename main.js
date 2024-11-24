@@ -202,102 +202,48 @@ async function loadFlashcards() {
     }
 }
 
-// 在 head 部分添加 ResponsiveVoice CDN
-document.head.innerHTML += `
-    <script src="https://code.responsivevoice.org/responsivevoice.js?key=C065BhbX"></script>
-`;
-
 // 在文件頂部添加語音合成相關的變量
-let speechSynthesis = window.speechSynthesis;
-let speechVoice = null;
+// let speechSynthesis = window.speechSynthesis;
+// let speechVoice = null;
 
-// 在 DOMContentLoaded 事件中初始化所有功能
+// 在 DOMContentLoaded 事件中初始化語音設置
 document.addEventListener('DOMContentLoaded', () => {
-    // 初始化語音設置
-    initSpeech();
-    
+    // 刪除這行
+    // initSpeech();
+
+    // 添加隨機排序按鈕事件
+    const shuffleButton = document.getElementById('shuffleCards');
+    shuffleButton.addEventListener('click', shuffleFlashcards);
+
     // 添加設定面板折疊功能
     const toggleButton = document.getElementById('toggleSettings');
     const settings = document.querySelector('.settings');
     
     toggleButton.addEventListener('click', () => {
         settings.classList.toggle('collapsed');
+        
+        // 保存折疊狀態
         localStorage.setItem('settingsCollapsed', settings.classList.contains('collapsed'));
     });
 
-    // 載入保存的折狀態
+    // 載入保存的折疊狀態
     const savedCollapsed = localStorage.getItem('settingsCollapsed');
     if (savedCollapsed === 'true') {
         settings.classList.add('collapsed');
     }
-
-    // 其他初始化代碼...
 });
 
-// 修改語音初始化函數
-function initSpeech() {
-    // 等待 ResponsiveVoice 完全載入
-    if (window.responsiveVoice) {
-        console.log('ResponsiveVoice 已載入');
-        responsiveVoice.init();
-        
-        // 確認語音引擎狀態
-        console.log('ResponsiveVoice 狀態:', {
-            isInitialized: responsiveVoice.isInitialized(),
-            voiceSupport: responsiveVoice.voiceSupport()
-        });
-    } else {
-        console.error('ResponsiveVoice 未載入');
-        // 如果未載入，1秒後重試
-        setTimeout(initSpeech, 1000);
-    }
-}
-
-// 修改語音播放函數
+// 修改speakWord函數
 function speakWord(word) {
-    if (!word) {
-        console.error('沒有要播放的文字');
-        return;
+    if (word) {
+        responsiveVoice.cancel(); // 如果有正在播放的語音，先停止
+        responsiveVoice.speak(word, "UK English Female", {
+            rate: 0.8,
+            pitch: 1,
+            volume: 1
+        });
     }
-
-    // 確保 ResponsiveVoice 已載入
-    if (!window.responsiveVoice) {
-        console.error('ResponsiveVoice 未載入，重新初始化...');
-        initSpeech();
-        setTimeout(() => speakWord(word), 1000);
-        return;
-    }
-
-    // 強制取消任何正在播放的語音
-    if (responsiveVoice.isPlaying()) {
-        responsiveVoice.cancel();
-    }
-
-    console.log('開始播放語音:', word);
-    
-    // 強制使用 ResponsiveVoice
-    responsiveVoice.speak(word, "US English Female", {
-        pitch: 1,
-        rate: 0.8,
-        volume: 1,
-        onstart: () => console.log('ResponsiveVoice 開始播放'),
-        onend: () => console.log('ResponsiveVoice 播放完成'),
-        onerror: (e) => console.error('ResponsiveVoice 播放錯誤:', e)
-    });
 }
-
-// 在文檔載入時初始化語音
-document.addEventListener('DOMContentLoaded', () => {
-    // 確保 ResponsiveVoice 完全載入後再初始化
-    if (window.responsiveVoice) {
-        initSpeech();
-    } else {
-        // 如果還沒載入，等待一下再試
-        setTimeout(initSpeech, 1000);
-    }
-    
-    // ... 其他初始化代碼 ...
-});
 
 // 修改 createFlashcard 函數，添加語音功能
 function createFlashcard(imageUrl, word, fileName) {
