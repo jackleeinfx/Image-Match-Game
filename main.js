@@ -350,20 +350,28 @@ function createFlashcard(imageUrl, word, fileName) {
         }
     };
     
-    // 修改雙擊事件，添加語音播放
+    // 移除雙擊事件，改用觸摸事件
+    let lastTap = 0;
+    card.addEventListener('touchend', function(e) {
+        const currentTime = new Date().getTime();
+        const tapLength = currentTime - lastTap;
+        
+        if (tapLength < 500 && tapLength > 0) {
+            // 雙擊事件
+            e.preventDefault();
+            card.classList.toggle('show-all');
+            speakWord(word);
+            setTimeout(() => {
+                card.classList.remove('show-all');
+            }, 3000);
+        }
+        lastTap = currentTime;
+    });
+
+    // 保留原有的雙擊事件用於桌面設備
     card.addEventListener('dblclick', () => {
         card.classList.toggle('show-all');
-        
-        // 在 iOS 上，使用 touch 事件可能更可靠
-        if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
-            // 確保在用戶交互時播放
-            document.body.addEventListener('touchend', () => {
-                speakWord(word);
-            }, { once: true });
-        } else {
-            speakWord(word);
-        }
-
+        speakWord(word);
         setTimeout(() => {
             card.classList.remove('show-all');
         }, 3000);
