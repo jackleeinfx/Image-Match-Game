@@ -231,6 +231,27 @@ document.addEventListener('DOMContentLoaded', () => {
     if (savedCollapsed === 'true') {
         settings.classList.add('collapsed');
     }
+
+    // 添加卡片大小控制
+    const cardSizeSlider = document.getElementById('cardSize');
+    const sizeValueDisplay = document.getElementById('sizeValue');
+    
+    // 載入保存的卡片大小
+    const savedSize = localStorage.getItem('cardSize');
+    if (savedSize) {
+        cardSizeSlider.value = savedSize;
+        updateCardSize(savedSize);
+    }
+
+    cardSizeSlider.addEventListener('input', (e) => {
+        const size = e.target.value;
+        updateCardSize(size);
+    });
+
+    cardSizeSlider.addEventListener('change', (e) => {
+        // 當滑軌停止時保存大小設置
+        localStorage.setItem('cardSize', e.target.value);
+    });
 });
 
 // 修改speakWord函數
@@ -443,4 +464,10 @@ function shuffleFlashcards() {
         // 恢復顯示
         flashcardsContainer.style.opacity = '1';
     }, 300); // 等待淡出動畫完成
+}
+
+// 添加更新卡片大小的函數
+function updateCardSize(size) {
+    document.documentElement.style.setProperty('--card-size', size + 'px');
+    document.getElementById('sizeValue').textContent = size + 'px';
 } 
