@@ -202,63 +202,66 @@ async function loadFlashcards() {
     }
 }
 
+// 在 head 部分添加 ResponsiveVoice CDN
+document.head.innerHTML += `
+    <script src="https://code.responsivevoice.org/responsivevoice.js?key=C065BhbX"></script>
+`;
+
 // 在文件頂部添加語音合成相關的變量
 let speechSynthesis = window.speechSynthesis;
 let speechVoice = null;
 
-// 在 DOMContentLoaded 事件中初始化語音設置
+// 在 DOMContentLoaded 事件中初始化所有功能
 document.addEventListener('DOMContentLoaded', () => {
-    // ... 原有的代碼 ...
-
     // 初始化語音設置
     initSpeech();
-
-    // 添加隨機排序按鈕事件
-    const shuffleButton = document.getElementById('shuffleCards');
-    shuffleButton.addEventListener('click', shuffleFlashcards);
-
+    
     // 添加設定面板折疊功能
     const toggleButton = document.getElementById('toggleSettings');
     const settings = document.querySelector('.settings');
     
     toggleButton.addEventListener('click', () => {
         settings.classList.toggle('collapsed');
-        
-        // 保存折疊狀態
         localStorage.setItem('settingsCollapsed', settings.classList.contains('collapsed'));
     });
 
-    // 載入保存的折疊狀態
+    // 載入保存的折狀態
     const savedCollapsed = localStorage.getItem('settingsCollapsed');
     if (savedCollapsed === 'true') {
         settings.classList.add('collapsed');
     }
+
+    // 其他初始化代碼...
 });
 
-// 添加語音初始化函數
+// 簡化語音初始化函數
 function initSpeech() {
-    // 等待語音列表載入
-    speechSynthesis.addEventListener('voiceschanged', () => {
-        const voices = speechSynthesis.getVoices();
-        // 尋找英語語音
-        speechVoice = voices.find(voice => 
-            voice.lang.includes('en') && voice.localService
-        ) || voices[0];
-        console.log('已選擇語音：', speechVoice.name);
-    });
+    // 確保 ResponsiveVoice 已經載入
+    if (window.responsiveVoice) {
+        console.log('ResponsiveVoice 已載入');
+        responsiveVoice.init();
+    } else {
+        console.error('ResponsiveVoice 未載入');
+    }
 }
 
-// 添加語音播放函數
+// 簡化語音播放函數
 function speakWord(word) {
-    // 如果有正在播放的語音，先停止
-    speechSynthesis.cancel();
+    if (!word) {
+        console.error('沒有要播放的文字');
+        return;
+    }
 
-    if (word && speechVoice) {
-        const utterance = new SpeechSynthesisUtterance(word);
-        utterance.voice = speechVoice;
-        utterance.rate = 0.8; // 語速稍慢
-        utterance.pitch = 1;
-        speechSynthesis.speak(utterance);
+    if (window.responsiveVoice && responsiveVoice.voiceSupport()) {
+        console.log('使用 ResponsiveVoice 播放:', word);
+        responsiveVoice.speak(word, "US English Female", {
+            pitch: 1,
+            rate: 0.8,
+            volume: 1,
+            onend: () => console.log('ResponsiveVoice 播放完成')
+        });
+    } else {
+        console.error('ResponsiveVoice未載入或不支援');
     }
 }
 
