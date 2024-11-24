@@ -202,120 +202,153 @@ async function loadFlashcards() {
     }
 }
 
+// 在 head 部分添加 ResponsiveVoice CDN
+document.head.innerHTML += `
+    <script src="https://code.responsivevoice.org/responsivevoice.js?key=C065BhbX"></script>
+`;
+
 // 在文件頂部添加語音合成相關的變量
 let speechSynthesis = window.speechSynthesis;
 let speechVoice = null;
 
-// 在 DOMContentLoaded 事件中初始化語音設置
+// 在 DOMContentLoaded 事件中初始化所有功能
 document.addEventListener('DOMContentLoaded', () => {
-    // ... 原有的代碼 ...
-
     // 初始化語音設置
     initSpeech();
-
-    // 添加隨機排序按鈕事件
-    const shuffleButton = document.getElementById('shuffleCards');
-    shuffleButton.addEventListener('click', shuffleFlashcards);
-
+    
     // 添加設定面板折疊功能
     const toggleButton = document.getElementById('toggleSettings');
     const settings = document.querySelector('.settings');
     
     toggleButton.addEventListener('click', () => {
         settings.classList.toggle('collapsed');
-        
-        // 保存折疊狀態
         localStorage.setItem('settingsCollapsed', settings.classList.contains('collapsed'));
     });
 
-    // 載入保存的折疊狀態
+    // 載入保存的折狀態
     const savedCollapsed = localStorage.getItem('settingsCollapsed');
     if (savedCollapsed === 'true') {
         settings.classList.add('collapsed');
     }
+
+    // 其他初始化代碼...
 });
 
 // 修改語音初始化函數
 function initSpeech() {
-    // 檢查瀏覽器是否支援語音合成
-    if (!window.speechSynthesis) {
-        console.warn('此瀏覽器不支援語音合成');
-        return;
+    const voiceSwitch = document.getElementById('useGoogleVoice');
+    const voiceTypeSpan = document.querySelector('.voice-type');
+    
+    // 確保 ResponsiveVoice 已經載入
+    if (window.responsiveVoice) {
+        console.log('ResponsiveVoice 已載入');
+        responsiveVoice.init();
     }
-
-    // 在 iOS 上需要在用戶交互時初始化語音
-    function initVoices() {
-        const voices = speechSynthesis.getVoices();
-        if (voices.length > 0) {
-            // 優先選擇英語語音
-            speechVoice = voices.find(voice => 
-                voice.lang.includes('en')
-            ) || voices[0];
-            console.log('已選擇語音：', speechVoice.name);
-        } else {
-            console.warn('沒有可用的語音');
+    
+    // 載入保存的語音設置
+    const savedVoiceType = localStorage.getItem('useGoogleVoice');
+    if (savedVoiceType !== null) {
+        voiceSwitch.checked = savedVoiceType === 'true';
+        updateVoiceTypeText();
+    }
+    
+    // 監聽語音切換
+    voiceSwitch.addEventListener('change', function() {
+        const isChecked = this.checked;
+        console.log('語音切換狀態:', isChecked);
+        
+        // 保存選擇
+        localStorage.setItem('useGoogleVoice', isChecked);
+        
+        // 更新顯示
+        updateVoiceTypeText();
+        
+        // 測試當前選擇的語音
+        testVoice();
+    });
+    
+    // 更新顯示文字
+    function updateVoiceTypeText() {
+        const currentVoice = voiceSwitch.checked ? 'ResponsiveVoice' : '瀏覽器語音';
+        voiceTypeSpan.textContent = `目前：${currentVoice}`;
+        console.log('更新語音類型顯示:', currentVoice);
+    }
+    
+    // 初始化瀏覽器語音
+    if (window.speechSynthesis) {
+        if (speechSynthesis.getVoices().length > 0) {
+            setupBrowserVoice();
         }
+        speechSynthesis.addEventListener('voiceschanged', setupBrowserVoice);
     }
+}
 
-    // 如果語音列表已經可用，直接初始化
-    if (speechSynthesis.getVoices().length > 0) {
-        initVoices();
-    }
+// 設置瀏覽器語音
+function setupBrowserVoice() {
+    const voices = speechSynthesis.getVoices();
+    speechVoice = voices.find(voice => 
+        voice.lang.includes('en') && voice.localService
+    ) || voices[0];
+    console.log('已選擇瀏覽器語音：', speechVoice?.name);
+}
 
-    // 監聽語音列表變化
-    speechSynthesis.addEventListener('voiceschanged', initVoices);
+// 修改測試語音函數
+function testVoice() {
+    const testWord = 'hello';
+    console.log('測試語音播放:', testWord);
+    speakWord(testWord);
 }
 
 // 修改語音播放函數
 function speakWord(word) {
-    // 檢查是否為 iOS 設備
-    const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
-    
-    if (isIOS) {
-        // 使用 Google Translate TTS API
-        const audio = new Audio();
-        const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(word)}&tl=en&client=tw-ob`;
-        
-        // 播放音頻
-        audio.src = ttsUrl;
-        audio.play().catch(error => {
-            console.error('Google TTS 播放失敗：', error);
-            // 如果 Google TTS 失敗，回退到原本的 Web Speech API
-            fallbackSpeak(word);
-        });
-    } else {
-        // 非 iOS 設備使用原本的 Web Speech API
-        fallbackSpeak(word);
-    }
-}
-
-// 原本的 Web Speech API 作為後備方案
-function fallbackSpeak(word) {
-    if (!window.speechSynthesis || !word) {
-        console.warn('語音功能不可用或沒有文字');
+    if (!word) {
+        console.error('沒有要播放的文字');
         return;
     }
 
-    speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(word);
+    const useResponsiveVoice = document.getElementById('useGoogleVoice').checked;
+    console.log('當前語音模式:', useResponsiveVoice ? 'ResponsiveVoice' : '瀏覽器語音');
     
-    if (speechVoice) {
-        utterance.voice = speechVoice;
+    if (useResponsiveVoice) {
+        // 使用 ResponsiveVoice
+        if (window.responsiveVoice && responsiveVoice.voiceSupport()) {
+            console.log('使用 ResponsiveVoice 播放:', word);
+            responsiveVoice.speak(word, "US English Female", {
+                pitch: 1,
+                rate: 0.8,
+                volume: 1,
+                onend: () => console.log('ResponsiveVoice 播放完成')
+            });
+        } else {
+            console.error('ResponsiveVoice未載入或不支援，切換回瀏覽器語音');
+            document.getElementById('useGoogleVoice').checked = false;
+            localStorage.setItem('useGoogleVoice', 'false');
+            speakWordBrowser(word);
+        }
+    } else {
+        speakWordBrowser(word);
+    }
+}
+
+// 瀏覽器原生語音播放函數
+function speakWordBrowser(word) {
+    if (!window.speechSynthesis) {
+        console.error('瀏覽器不支援語音合成');
+        return;
     }
 
-    utterance.rate = 0.8;
-    utterance.pitch = 1;
-    utterance.volume = 1;
-    utterance.lang = 'en-US';
+    console.log('使用瀏覽器語音播放:', word);
+    speechSynthesis.cancel(); // 取消之前的語音
 
-    utterance.onerror = (event) => {
-        console.error('Web Speech API 錯誤：', event);
-    };
-
-    try {
+    if (word && speechVoice) {
+        const utterance = new SpeechSynthesisUtterance(word);
+        utterance.voice = speechVoice;
+        utterance.rate = 0.8;
+        utterance.pitch = 1;
+        utterance.onend = () => console.log('瀏覽器語音播放完成');
         speechSynthesis.speak(utterance);
-    } catch (error) {
-        console.error('Web Speech API 播放失敗：', error);
+    } else {
+        console.error('無法播放語音：', word ? '未找到語音' : '無文字');
     }
 }
 
@@ -350,27 +383,10 @@ function createFlashcard(imageUrl, word, fileName) {
         }
     };
     
-    // 移除雙擊事件，改用觸摸事件
-    let lastTap = 0;
-    card.addEventListener('touchend', function(e) {
-        const currentTime = new Date().getTime();
-        const tapLength = currentTime - lastTap;
-        
-        if (tapLength < 500 && tapLength > 0) {
-            // 雙擊事件
-            e.preventDefault();
-            card.classList.toggle('show-all');
-            speakWord(word);
-            setTimeout(() => {
-                card.classList.remove('show-all');
-            }, 3000);
-        }
-        lastTap = currentTime;
-    });
-
-    // 保留原有的雙擊事件用於桌面設備
+    // 修改雙擊事件，添加語音播放
     card.addEventListener('dblclick', () => {
         card.classList.toggle('show-all');
+        // 播放單詞語音
         speakWord(word);
         setTimeout(() => {
             card.classList.remove('show-all');
