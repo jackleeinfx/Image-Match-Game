@@ -268,49 +268,54 @@ function initSpeech() {
 
 // 修改語音播放函數
 function speakWord(word) {
-    // 檢查是否支援語音功能
+    // 檢查是否為 iOS 設備
+    const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+    
+    if (isIOS) {
+        // 使用 Google Translate TTS API
+        const audio = new Audio();
+        const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(word)}&tl=en&client=tw-ob`;
+        
+        // 播放音頻
+        audio.src = ttsUrl;
+        audio.play().catch(error => {
+            console.error('Google TTS 播放失敗：', error);
+            // 如果 Google TTS 失敗，回退到原本的 Web Speech API
+            fallbackSpeak(word);
+        });
+    } else {
+        // 非 iOS 設備使用原本的 Web Speech API
+        fallbackSpeak(word);
+    }
+}
+
+// 原本的 Web Speech API 作為後備方案
+function fallbackSpeak(word) {
     if (!window.speechSynthesis || !word) {
         console.warn('語音功能不可用或沒有文字');
         return;
     }
 
-    // 在 iOS 上需要先暫停再重新開始
     speechSynthesis.cancel();
-
-    // 創建新的語音實例
     const utterance = new SpeechSynthesisUtterance(word);
     
-    // 如果有可用的語音，使用它
     if (speechVoice) {
         utterance.voice = speechVoice;
     }
 
-    // 設置語音參數
-    utterance.rate = 0.8;  // 語速
-    utterance.pitch = 1;   // 音調
-    utterance.volume = 1;  // 音量
-    utterance.lang = 'en-US';  // 確保使用英語
+    utterance.rate = 0.8;
+    utterance.pitch = 1;
+    utterance.volume = 1;
+    utterance.lang = 'en-US';
 
-    // 添加錯誤處理
     utterance.onerror = (event) => {
-        console.error('語音播放錯誤：', event);
+        console.error('Web Speech API 錯誤：', event);
     };
 
-    // 在 iOS 上需要在用戶交互時播放
     try {
         speechSynthesis.speak(utterance);
-        
-        // iOS 的特殊處理
-        if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
-            setTimeout(() => {
-                // 確保語音開始播放
-                if (speechSynthesis.paused) {
-                    speechSynthesis.resume();
-                }
-            }, 100);
-        }
     } catch (error) {
-        console.error('語音播放失敗：', error);
+        console.error('Web Speech API 播放失敗：', error);
     }
 }
 
