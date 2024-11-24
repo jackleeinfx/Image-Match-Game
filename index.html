@@ -8,9 +8,25 @@
 </head>
 <body>
     <div class="container">
-        <div class="search-section">
+        <div class="settings">
+            <label>
+                <input type="checkbox" id="hideControls"> 僅顯示單詞卡
+            </label>
+            <div class="view-controls">
+                <button id="showImagesOnly">純圖片模式</button>
+                <button id="showWordsOnly">純單詞模式</button>
+                <button id="showComplete">完整模式</button>
+                <button id="shuffleCards">隨機排序</button>
+            </div>
+        </div>
+
+        <div class="search-section" id="controlSection">
             <input type="text" id="searchInput" placeholder="請輸入搜尋關鍵字">
             <button id="searchButton">搜尋圖片</button>
+        </div>
+        
+        <div id="dropZone" class="drop-zone">
+            <p>將圖片拖放到這裡</p>
         </div>
         
         <div id="searchResults" class="image-grid"></div>
@@ -24,6 +40,7 @@
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <script src="main.js"></script>
 </body>
 </html> 

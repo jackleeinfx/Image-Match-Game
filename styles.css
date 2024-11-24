@@ -53,12 +53,14 @@
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
     gap: 20px;
+    transition: opacity 0.3s ease;
 }
 
 .flashcard {
     border: 1px solid #ddd;
     padding: 15px;
     text-align: center;
+    transition: all 0.3s ease;
 }
 
 .flashcard img {
@@ -66,4 +68,197 @@
     height: 200px;
     object-fit: cover;
     margin-bottom: 10px;
+}
+
+.image-container {
+    position: relative;
+    width: 100%;
+    height: 200px;
+}
+
+.image-container img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.save-button {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.image-container:hover .save-button {
+    opacity: 1;
+}
+
+.save-button:hover {
+    background-color: #45a049;
+}
+
+.delete-button {
+    background-color: #ff4444;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-top: 10px;
+}
+
+.delete-button:hover {
+    background-color: #cc0000;
+}
+
+.drop-zone {
+    border: 2px dashed #ccc;
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    margin: 20px 0;
+    background-color: #f9f9f9;
+    transition: all 0.3s ease;
+}
+
+.drop-zone.dragover {
+    background-color: #e1f5fe;
+    border-color: #2196F3;
+}
+
+.drop-zone p {
+    margin: 0;
+    color: #666;
+    font-size: 16px;
+}
+
+/* 添加設定區域的樣式 */
+.settings {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    background-color: #f8f8f8;
+    padding: 10px;
+    border-radius: 5px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    z-index: 1000;
+}
+
+.settings label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+}
+
+.settings input[type="checkbox"] {
+    cursor: pointer;
+}
+
+/* 添加隱藏控制項的樣式 */
+.hide-controls #controlSection,
+.hide-controls #dropZone,
+.hide-controls #searchResults {
+    display: none;
+}
+
+/* 當控制項隱藏時，調整單詞卡區域的樣式 */
+.hide-controls .flashcards-section {
+    margin-top: 20px;
+}
+
+/* 設定區域的新樣式 */
+.settings {
+    min-width: 150px;
+}
+
+.view-controls {
+    margin-top: 10px;
+    display: flex;
+    gap: 5px;
+    flex-direction: column;
+}
+
+.view-controls button {
+    padding: 5px 10px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.view-controls button:hover {
+    background-color: #45a049;
+}
+
+/* 單詞卡的新樣式 */
+.flashcard {
+    cursor: pointer;
+    user-select: none;
+}
+
+/* 純圖片模式 */
+.images-only .flashcard .word-div {
+    display: none;
+}
+
+/* 純單詞模式 */
+.words-only .flashcard img {
+    display: none;
+}
+
+/* 當雙擊時顯示完整內容的樣式 */
+.flashcard.show-all img,
+.flashcard.show-all .word-div {
+    display: block !important;
+}
+
+/* 完整模式按鈕樣式 */
+#showComplete {
+    background-color: #2196F3;  /* 使用不同的顏色區分 */
+}
+
+#showComplete:hover {
+    background-color: #1976D2;
+}
+
+/* 完整模式下確保所有元素都顯示 */
+.complete-mode .flashcard img,
+.complete-mode .flashcard .word-div {
+    display: block;
+}
+
+/* 當前選中的模式按鈕樣式 */
+.images-only #showImagesOnly,
+.words-only #showWordsOnly,
+.complete-mode #showComplete {
+    border: 2px solid #fff;
+    box-shadow: 0 0 5px rgba(0,0,0,0.3);
+}
+
+/* 添加隨機排序按鈕樣式 */
+#shuffleCards {
+    background-color: #9C27B0;  /* 使用紫色來區分 */
+    color: white;
+}
+
+#shuffleCards:hover {
+    background-color: #7B1FA2;
+}
+
+/* 添加卡片切換動畫 */
+#flashcards {
+    transition: opacity 0.3s ease;
+}
+
+.flashcard {
+    transition: all 0.3s ease;
 } 
