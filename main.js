@@ -222,7 +222,7 @@ document.addEventListener('DOMContentLoaded', () => {
     toggleButton.addEventListener('click', () => {
         settings.classList.toggle('collapsed');
         
-        // 保存折疊狀態
+        // 保存��疊狀態
         localStorage.setItem('settingsCollapsed', settings.classList.contains('collapsed'));
     });
 
@@ -282,18 +282,19 @@ function createFlashcard(imageUrl, word, fileName) {
     wordDiv.textContent = word;
     
     const deleteButton = document.createElement('button');
-    deleteButton.textContent = '刪除';
+    deleteButton.textContent = '×';  // 使用 × 符號
     deleteButton.className = 'delete-button';
     deleteButton.onclick = async (e) => {
         e.stopPropagation();
-        try {
-            const imageRef = storage.ref(`images/${fileName}`);
-            await imageRef.delete();
-            card.remove();
-            alert('刪除成功！');
-        } catch (error) {
-            console.error('刪除失敗：', error);
-            alert('刪除失敗：' + error.message);
+        if(confirm('確定要刪除這張卡片嗎？')) {  // 添加確認提示
+            try {
+                const imageRef = storage.ref(`images/${fileName}`);
+                await imageRef.delete();
+                card.remove();
+            } catch (error) {
+                console.error('刪除失敗：', error);
+                alert('刪除失敗：' + error.message);
+            }
         }
     };
     
@@ -415,7 +416,7 @@ async function handleDrop(e) {
         for (let i = 0; i < items.length; i++) {
             const item = items[i];
             
-            // 如果是圖片URL（從其他網站拖放）
+            // 如果是圖片URL���從其他網站拖放）
             if (item.kind === 'string' && item.type.match('^text/plain')) {
                 item.getAsString(async (url) => {
                     try {
@@ -446,7 +447,7 @@ async function handleDrop(e) {
     }
 }
 
-// 添加隨機排序函數
+// ��加隨機排序函數
 function shuffleFlashcards() {
     const flashcardsContainer = document.getElementById('flashcards');
     const flashcards = Array.from(flashcardsContainer.children);
