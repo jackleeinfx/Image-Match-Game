@@ -219,11 +219,21 @@ async function loadFlashcards() {
 document.addEventListener('DOMContentLoaded', () => {
     // 添加頂部隨機排序按鈕事件
     const topShuffleButton = document.getElementById('topShuffleButton');
-    topShuffleButton.addEventListener('click', shuffleFlashcards);
+    if (topShuffleButton) {
+        topShuffleButton.addEventListener('click', () => {
+            shuffleFlashcards();
+            showTemporaryMessage('單詞卡已隨機排序！');
+        });
+    }
 
     // 添加隨機排序按鈕事件
     const shuffleButton = document.getElementById('shuffleCards');
-    shuffleButton.addEventListener('click', shuffleFlashcards);
+    if (shuffleButton) {
+        shuffleButton.addEventListener('click', () => {
+            shuffleFlashcards();
+            showTemporaryMessage('單詞卡已隨機排序！');
+        });
+    }
 
     // 添加設定面板折疊功能
     const toggleButton = document.getElementById('toggleSettings');
@@ -296,15 +306,14 @@ function createFlashcard(imageUrl, word, fileName) {
     deleteButton.className = 'delete-button';
     deleteButton.onclick = async (e) => {
         e.stopPropagation();
-        if(confirm('確定要刪除這張卡片嗎？')) {
-            try {
-                const imageRef = storage.ref(`images/${fileName}`);
-                await imageRef.delete();
-                card.remove();
-            } catch (error) {
-                console.error('刪除失敗：', error);
-                showTemporaryMessage('刪除失敗：' + error.message, 'error');
-            }
+        try {
+            const imageRef = storage.ref(`images/${fileName}`);
+            await imageRef.delete();
+            card.remove();
+            showTemporaryMessage('卡片已刪除！');
+        } catch (error) {
+            console.error('刪除失敗：', error);
+            showTemporaryMessage('刪除失敗：' + error.message, 'error');
         }
     };
     
@@ -424,7 +433,10 @@ async function handleDrop(e) {
     try {
         // 先詢問一次單詞
         const word = prompt('請輸入這張圖片的單詞：');
-        if (!word) return;  // 如果用戶取消或未輸入，則退出
+        if (!word) {
+            showTemporaryMessage('已取消添加圖片', 'error');
+            return;  // 如果用戶取消或未輸入，則退出
+        }
 
         // 處理拖放的項目
         for (let i = 0; i < items.length; i++) {
@@ -435,9 +447,10 @@ async function handleDrop(e) {
                 item.getAsString(async (url) => {
                     try {
                         await saveImageToFirebase(url, word);
+                        showTemporaryMessage('圖片已成功添加！');
                     } catch (error) {
                         console.error('處理拖放的URL過程中發生錯誤：', error);
-                        // 不顯示錯誤提示，因為可能是中間過程的錯誤
+                        showTemporaryMessage('添加失敗：' + error.message, 'error');
                     }
                 });
             }
@@ -448,16 +461,16 @@ async function handleDrop(e) {
                     const imageUrl = URL.createObjectURL(file);
                     await saveImageToFirebase(imageUrl, word);
                     URL.revokeObjectURL(imageUrl);
+                    showTemporaryMessage('圖片已成功添加！');
                 } catch (error) {
                     console.error('處理拖放的文件過程中發生錯誤：', error);
-                    // 不顯示錯誤提示，因為可能是中間過程的錯誤
+                    showTemporaryMessage('添加失敗：' + error.message, 'error');
                 }
             }
         }
     } catch (error) {
         console.error('拖放處理失敗：', error);
-        // 只在整個過程完全失敗時才顯示錯誤
-        alert('處理圖片失敗：' + error.message);
+        showTemporaryMessage('處理圖片失敗：' + error.message, 'error');
     }
 }
 
