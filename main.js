@@ -131,12 +131,13 @@ async function saveImageToFirebase(imageUrl, searchTerm) {
         // 创建单词卡
         createFlashcard(downloadUrl, searchTerm, fileName);
         
-        alert('圖片已成功儲存！');
+        // 顯示臨時提示
+        showTemporaryMessage('圖片已成功儲存！');
         
     } catch (error) {
         console.error('儲存過程中發生錯誤：', error);
-        // 不要在这里显示错误提示，因为可能是中间过程的错误，而最终保存是成功的
-        throw error;  // 将错误往上抛，让调用者处理
+        showTemporaryMessage('儲存失敗：' + error.message, 'error');
+        throw error;
     }
 }
 
@@ -158,7 +159,15 @@ function displaySearchResults(images, searchTerm) {
         const saveButton = document.createElement('button');
         saveButton.className = 'save-button';
         saveButton.textContent = '儲存圖片';
-        saveButton.addEventListener('click', () => saveImageToFirebase(image.link, searchTerm));
+        
+        // 修改儲存按鈕的事件處理
+        saveButton.addEventListener('click', async () => {
+            try {
+                await saveImageToFirebase(image.link, searchTerm);
+            } catch (error) {
+                console.error('儲存圖片時發生錯誤：', error);
+            }
+        });
         
         imgContainer.appendChild(img);
         imgContainer.appendChild(saveButton);
@@ -208,8 +217,9 @@ async function loadFlashcards() {
 
 // 在 DOMContentLoaded 事件中初始化語音設置
 document.addEventListener('DOMContentLoaded', () => {
-    // 刪除這行
-    // initSpeech();
+    // 添加頂部隨機排序按鈕事件
+    const topShuffleButton = document.getElementById('topShuffleButton');
+    topShuffleButton.addEventListener('click', shuffleFlashcards);
 
     // 添加隨機排序按鈕事件
     const shuffleButton = document.getElementById('shuffleCards');
@@ -222,7 +232,7 @@ document.addEventListener('DOMContentLoaded', () => {
     toggleButton.addEventListener('click', () => {
         settings.classList.toggle('collapsed');
         
-        // 保存��疊狀態
+        // 保存折疊狀態
         localStorage.setItem('settingsCollapsed', settings.classList.contains('collapsed'));
     });
 
@@ -282,26 +292,24 @@ function createFlashcard(imageUrl, word, fileName) {
     wordDiv.textContent = word;
     
     const deleteButton = document.createElement('button');
-    deleteButton.textContent = '×';  // 使用 × 符號
+    deleteButton.textContent = '×';
     deleteButton.className = 'delete-button';
     deleteButton.onclick = async (e) => {
         e.stopPropagation();
-        if(confirm('確定要刪除這張卡片嗎？')) {  // 添加確認提示
+        if(confirm('確定要刪除這張卡片嗎？')) {
             try {
                 const imageRef = storage.ref(`images/${fileName}`);
                 await imageRef.delete();
                 card.remove();
             } catch (error) {
                 console.error('刪除失敗：', error);
-                alert('刪除失敗：' + error.message);
+                showTemporaryMessage('刪除失敗：' + error.message, 'error');
             }
         }
     };
     
-    // 修改雙擊事件，添加語音播放
     card.addEventListener('dblclick', () => {
         card.classList.toggle('show-all');
-        // 播放單詞語音
         speakWord(word);
         setTimeout(() => {
             card.classList.remove('show-all');
@@ -311,7 +319,13 @@ function createFlashcard(imageUrl, word, fileName) {
     card.appendChild(img);
     card.appendChild(wordDiv);
     card.appendChild(deleteButton);
-    flashcardsDiv.appendChild(card);
+    
+    // 將新卡片插入到最上方
+    if (flashcardsDiv.firstChild) {
+        flashcardsDiv.insertBefore(card, flashcardsDiv.firstChild);
+    } else {
+        flashcardsDiv.appendChild(card);
+    }
 }
 
 // 在初始化部分添加拖放事件監聽
@@ -416,7 +430,7 @@ async function handleDrop(e) {
         for (let i = 0; i < items.length; i++) {
             const item = items[i];
             
-            // 如果是圖片URL���從其他網站拖放）
+            // 如果是圖片URL（從其他網站拖放）
             if (item.kind === 'string' && item.type.match('^text/plain')) {
                 item.getAsString(async (url) => {
                     try {
@@ -447,7 +461,7 @@ async function handleDrop(e) {
     }
 }
 
-// ��加隨機排序函數
+// 添加隨機排序函數
 function shuffleFlashcards() {
     const flashcardsContainer = document.getElementById('flashcards');
     const flashcards = Array.from(flashcardsContainer.children);
@@ -471,4 +485,18 @@ function shuffleFlashcards() {
 function updateCardSize(size) {
     document.documentElement.style.setProperty('--card-size', size + 'px');
     document.getElementById('sizeValue').textContent = size + 'px';
+}
+
+// 添加臨時提示函數
+function showTemporaryMessage(message, type = 'success') {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `temporary-message ${type}`;
+    messageDiv.textContent = message;
+    document.body.appendChild(messageDiv);
+
+    // 2秒後移除提示
+    setTimeout(() => {
+        messageDiv.classList.add('fade-out');
+        setTimeout(() => messageDiv.remove(), 500);
+    }, 2000);
 } 
