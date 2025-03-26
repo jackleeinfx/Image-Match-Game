@@ -33,15 +33,37 @@ try {
 const GOOGLE_API_KEY = 'AIzaSyDr_AXqYOMKlLTzqCwKzDM9o34sP3HmPS4';
 const SEARCH_ENGINE_ID = '352d6a09646db440e';
 
-document.getElementById('searchButton').addEventListener('click', searchImages);
+document.getElementById('searchButton').addEventListener('click', () => {
+    searchImages(1); // 重置到第一頁
+});
 
-async function searchImages() {
-    const searchTerm = document.getElementById('searchInput').value;
-    if (!searchTerm) return;
+// 添加分頁相關變量
+let currentPage = 1;
+let currentSearchTerm = '';
+let totalPages = 1;
 
-    const url = `https://www.googleapis.com/customsearch/v1?key=${GOOGLE_API_KEY}&cx=${SEARCH_ENGINE_ID}&searchType=image&q=${encodeURIComponent(searchTerm)}`;
+// 修改 searchImages 函數
+async function searchImages(page = 1) {
+    const searchTerm = document.getElementById('searchInput').value.trim();
+    if (!searchTerm) {
+        alert('請輸入搜尋關鍵字');
+        return;
+    }
+
+    currentSearchTerm = searchTerm;
+    currentPage = page;
+
+    // 修正分頁計算，確保 start 是有效的整數
+    const startIndex = ((page - 1) * 10) + 1;
+    if (isNaN(startIndex) || startIndex < 1) {
+        console.error('無效的起始索引:', startIndex);
+        return;
+    }
+
+    const url = `https://www.googleapis.com/customsearch/v1?key=${GOOGLE_API_KEY}&cx=${SEARCH_ENGINE_ID}&searchType=image&q=${encodeURIComponent(searchTerm)}&start=${startIndex}`;
 
     try {
+        console.log('開始搜尋:', url);
         const response = await fetch(url);
         const data = await response.json();
         
@@ -55,6 +77,13 @@ async function searchImages() {
             alert('沒有找到相關圖片');
             return;
         }
+
+        // 計算總頁數，確保不會出現 NaN
+        const totalResults = parseInt(data.searchInformation.totalResults) || 0;
+        totalPages = Math.max(1, Math.ceil(totalResults / 10));
+        
+        // 更新換頁按鈕狀態
+        updatePageButtons();
         
         console.log('搜尋結果：', data);
         displaySearchResults(data.items, searchTerm);
@@ -62,6 +91,34 @@ async function searchImages() {
         console.error('搜尋圖片時發生錯誤', error);
         alert('搜尋過程中發生錯誤，請檢查控制台');
     }
+}
+
+// 修改換頁按鈕事件處理
+document.getElementById('prevPage').addEventListener('click', () => {
+    if (currentPage > 1 && currentSearchTerm) {
+        const newPage = Math.max(1, currentPage - 1);
+        if (!isNaN(newPage)) {
+            searchImages(newPage);
+        }
+    }
+});
+
+document.getElementById('nextPage').addEventListener('click', () => {
+    if (currentPage < totalPages && currentSearchTerm) {
+        const newPage = Math.min(totalPages, currentPage + 1);
+        if (!isNaN(newPage)) {
+            searchImages(newPage);
+        }
+    }
+});
+
+// 添加更新換頁按鈕狀態的函數
+function updatePageButtons() {
+    const prevButton = document.getElementById('prevPage');
+    const nextButton = document.getElementById('nextPage');
+    
+    prevButton.disabled = currentPage <= 1;
+    nextButton.disabled = currentPage >= totalPages;
 }
 
 // 添加圖片快取相關函數
@@ -76,7 +133,7 @@ async function cacheImage(url, fileName) {
     }
 }
 
-// 添加圖片壓縮函數
+// 修改圖片壓縮函數，增加更多壓縮選項
 async function compressImage(blob) {
     return new Promise((resolve, reject) => {
         const img = new Image();
@@ -86,7 +143,7 @@ async function compressImage(blob) {
             let height = img.height;
             
             // 計算新的尺寸，保持寬高比
-            const maxDimension = 1200; // 最大尺寸
+            const maxDimension = 800; // 降低最大尺寸到 800px
             if (width > height && width > maxDimension) {
                 height = Math.round((height * maxDimension) / width);
                 width = maxDimension;
@@ -98,13 +155,27 @@ async function compressImage(blob) {
             canvas.width = width;
             canvas.height = height;
             const ctx = canvas.getContext('2d');
+            
+            // 使用雙線性插值算法來提高圖片品質
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
             ctx.drawImage(img, 0, 0, width, height);
             
-            // 使用較高的品質來壓縮
-            canvas.toBlob(resolve, 'image/jpeg', 0.85);
+            // 降低 JPEG 品質以減少檔案大小
+            canvas.toBlob(resolve, 'image/jpeg', 0.7);
         };
         img.onerror = reject;
         img.src = URL.createObjectURL(blob);
+    });
+}
+
+// 添加圖片預載入函數
+async function preloadImage(url) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = url;
     });
 }
 
@@ -117,28 +188,48 @@ async function saveImageToFirebase(imageUrl, searchTerm) {
         
         // 获取图片数据
         let blob;
-        if (imageUrl.startsWith('blob:')) {
-            const response = await fetch(imageUrl);
+        try {
+            // 先嘗試直接獲取圖片
+            const response = await fetch(imageUrl, {
+                mode: 'cors',
+                headers: {
+                    'Access-Control-Allow-Origin': '*'
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error('直接獲取圖片失敗');
+            }
+            
             blob = await response.blob();
-        } else {
+        } catch (error) {
+            console.log('直接獲取失敗，嘗試使用圖片元素獲取:', error);
+            
+            // 如果直接獲取失敗，使用圖片元素獲取
             blob = await new Promise((resolve, reject) => {
                 const img = new Image();
                 img.crossOrigin = 'anonymous';
+                
                 img.onload = () => {
                     const canvas = document.createElement('canvas');
                     canvas.width = img.width;
                     canvas.height = img.height;
                     const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0);
-                    canvas.toBlob(resolve, 'image/jpeg', 0.95);
+                    
+                    try {
+                        ctx.drawImage(img, 0, 0);
+                        canvas.toBlob(resolve, 'image/jpeg', 0.95);
+                    } catch (e) {
+                        reject(new Error('圖片處理失敗: ' + e.message));
+                    }
                 };
+                
                 img.onerror = () => {
-                    fetch(imageUrl)
-                        .then(response => response.blob())
-                        .then(resolve)
-                        .catch(reject);
+                    reject(new Error('圖片載入失敗'));
                 };
-                img.src = imageUrl;
+                
+                // 添加時間戳避免快取問題
+                img.src = imageUrl + (imageUrl.includes('?') ? '&' : '?') + 't=' + Date.now();
             });
         }
 
@@ -162,7 +253,7 @@ async function saveImageToFirebase(imageUrl, searchTerm) {
             },
             (error) => {
                 console.error('上傳失敗:', error);
-                alert('上傳失敗：' + error.message);
+                throw error;
             }
         );
         
@@ -198,6 +289,7 @@ function displaySearchResults(images, searchTerm) {
         const img = document.createElement('img');
         img.src = image.link;
         img.alt = searchTerm;
+        img.crossOrigin = 'anonymous'; // 添加跨域支援
         
         const saveButton = document.createElement('button');
         saveButton.className = 'save-button';
@@ -206,9 +298,16 @@ function displaySearchResults(images, searchTerm) {
         // 修改儲存按鈕的事件處理
         saveButton.addEventListener('click', async () => {
             try {
+                saveButton.disabled = true;
+                saveButton.textContent = '儲存中...';
                 await saveImageToFirebase(image.link, searchTerm);
             } catch (error) {
                 console.error('儲存圖片時發生錯誤：', error);
+                saveButton.textContent = '儲存失敗';
+                setTimeout(() => {
+                    saveButton.disabled = false;
+                    saveButton.textContent = '儲存圖片';
+                }, 2000);
             }
         });
         
@@ -219,7 +318,7 @@ function displaySearchResults(images, searchTerm) {
     });
 }
 
-// 修改 loadFlashcards 函數
+// 修改 loadFlashcards 函數，添加預載入和並行載入功能
 async function loadFlashcards() {
     try {
         console.log('開始載入單詞卡...');
@@ -240,7 +339,8 @@ async function loadFlashcards() {
         // 檢查快取是否可用
         const cacheAvailable = 'caches' in window;
         
-        for (const imageRef of imagesList.items) {
+        // 使用 Promise.all 並行處理圖片載入
+        const loadPromises = imagesList.items.map(async (imageRef) => {
             const fileName = imageRef.name;
             const word = fileName.split('_')[0];
             
@@ -248,7 +348,6 @@ async function loadFlashcards() {
                 let imageUrl;
                 
                 if (cacheAvailable) {
-                    // 嘗試從快取獲取圖片
                     const cache = await caches.open('image-cache');
                     const cachedResponse = await cache.match(fileName);
                     
@@ -256,27 +355,38 @@ async function loadFlashcards() {
                         console.log('從快取載入圖片:', fileName);
                         imageUrl = URL.createObjectURL(await cachedResponse.blob());
                     } else {
-                        // 如果快取中沒有，從 Firebase 下載並快取
                         console.log('從 Firebase 下載並快取圖片:', fileName);
                         imageUrl = await imageRef.getDownloadURL();
                         await cacheImage(imageUrl, fileName);
                     }
                 } else {
-                    // 如果快取不可用，直接從 Firebase 下載
                     console.log('從 Firebase 下載圖片:', fileName);
                     imageUrl = await imageRef.getDownloadURL();
                 }
                 
-                createFlashcard(imageUrl, word, fileName);
+                // 預載入圖片
+                await preloadImage(imageUrl);
+                return { imageUrl, word, fileName };
             } catch (error) {
                 console.error('載入圖片失敗:', fileName, error);
-                // 如果載入失敗，顯示錯誤訊息
+                return { error: true, word, fileName };
+            }
+        });
+
+        // 等待所有圖片載入完成
+        const results = await Promise.all(loadPromises);
+        
+        // 創建單詞卡
+        results.forEach(result => {
+            if (result.error) {
                 const errorCard = document.createElement('div');
                 errorCard.className = 'flashcard error';
-                errorCard.innerHTML = `<p>載入失敗: ${word}</p>`;
+                errorCard.innerHTML = `<p>載入失敗: ${result.word}</p>`;
                 flashcardsDiv.appendChild(errorCard);
+            } else {
+                createFlashcard(result.imageUrl, result.word, result.fileName);
             }
-        }
+        });
     } catch (error) {
         console.error('載入單詞卡時發生錯誤：', error);
         alert('載入單詞卡失敗：' + error.message);
@@ -292,19 +402,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // 添加頂部隨機排序按鈕事件
     const topShuffleButton = document.getElementById('topShuffleButton');
     if (topShuffleButton) {
-        topShuffleButton.addEventListener('click', () => {
-            shuffleFlashcards();
-            showTemporaryMessage('單詞卡已隨機排序！');
-        });
+        topShuffleButton.addEventListener('click', shuffleFlashcards);
     }
 
     // 添加隨機排序按鈕事件
     const shuffleButton = document.getElementById('shuffleCards');
     if (shuffleButton) {
-        shuffleButton.addEventListener('click', () => {
-            shuffleFlashcards();
-            showTemporaryMessage('單詞卡已隨機排序！');
-        });
+        shuffleButton.addEventListener('click', shuffleFlashcards);
     }
 
     // 添加設定面板折疊功能
@@ -358,7 +462,7 @@ function speakWord(word) {
     }
 }
 
-// 修改 createFlashcard 函數，添加語音功能
+// 修改 createFlashcard 函數，添加漸進式載入效果
 function createFlashcard(imageUrl, word, fileName) {
     const flashcardsDiv = document.getElementById('flashcards');
     
@@ -368,6 +472,7 @@ function createFlashcard(imageUrl, word, fileName) {
     const img = document.createElement('img');
     img.src = imageUrl;
     img.alt = word;
+    img.loading = 'lazy'; // 使用延遲載入
     
     const wordDiv = document.createElement('div');
     wordDiv.className = 'word-div';
@@ -546,24 +651,21 @@ async function handleDrop(e) {
     }
 }
 
-// 添加隨機排序函數
+// 修改 shuffleFlashcards 函數，移除提示訊息
 function shuffleFlashcards() {
     const flashcardsContainer = document.getElementById('flashcards');
     const flashcards = Array.from(flashcardsContainer.children);
     
-    // 添加淡出效果
     flashcardsContainer.style.opacity = '0';
     
     setTimeout(() => {
-        // Fisher-Yates 洗牌算法
         for (let i = flashcards.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             flashcardsContainer.appendChild(flashcards[j]);
         }
         
-        // 恢復顯示
         flashcardsContainer.style.opacity = '1';
-    }, 300); // 等待淡出動畫完成
+    }, 300);
 }
 
 // 添加更新卡片大小的函數
