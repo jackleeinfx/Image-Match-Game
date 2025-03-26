@@ -428,4 +428,20 @@ body {
 .temporary-message.fade-out {
     opacity: 0;
 }
+
+/* 添加錯誤狀態樣式 */
+.flashcard.error {
+    background-color: #2d2d2d;
+    border-color: #e53e3e;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100px;
+}
+
+.flashcard.error p {
+    color: #e53e3e;
+    margin: 0;
+    text-align: center;
+}
   

@@ -3,115 +3,6 @@ if (!firebase) {
     console.error('Firebase SDK 未載入');
 }
 
-// IndexedDB 配置
-const DB_NAME = 'imageGameDB';
-const DB_VERSION = 1;
-const STORE_NAME = 'imageCache';
-let db;
-let storage;
-
-// 初始化 IndexedDB
-function initDB() {
-    return new Promise((resolve, reject) => {
-        const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => {
-            db = request.result;
-            resolve(db);
-        };
-
-        request.onupgradeneeded = (event) => {
-            const db = event.target.result;
-            if (!db.objectStoreNames.contains(STORE_NAME)) {
-                db.createObjectStore(STORE_NAME, { keyPath: 'fileName' });
-            }
-        };
-    });
-}
-
-// 初始化 Firebase
-async function initFirebase() {
-    try {
-        firebase.initializeApp(firebaseConfig);
-        storage = firebase.storage();
-        console.log('Firebase 初始化成功');
-        return true;
-    } catch (error) {
-        console.error('Firebase 初始化失敗:', error);
-        return false;
-    }
-}
-
-// 圖片壓縮函數
-async function compressImage(blob) {
-    return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => {
-            const canvas = document.createElement('canvas');
-            let width = img.width;
-            let height = img.height;
-            
-            // 計算新的尺寸，保持寬高比
-            const maxSize = 800; // 最大尺寸
-            if (width > height && width > maxSize) {
-                height = Math.round((height * maxSize) / width);
-                width = maxSize;
-            } else if (height > maxSize) {
-                width = Math.round((width * maxSize) / height);
-                height = maxSize;
-            }
-            
-            canvas.width = width;
-            canvas.height = height;
-            
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, width, height);
-            
-            // 使用較高的質量來保持圖片清晰度
-            canvas.toBlob(resolve, 'image/jpeg', 0.85);
-        };
-        img.onerror = reject;
-        img.src = URL.createObjectURL(blob);
-    });
-}
-
-// 快取圖片
-async function cacheImage(fileName, blob) {
-    if (!db) {
-        console.error('IndexedDB 未初始化');
-        return;
-    }
-    try {
-        const store = db.transaction(STORE_NAME, 'readwrite').objectStore(STORE_NAME);
-        await store.put({ fileName, blob, timestamp: Date.now() });
-    } catch (error) {
-        console.error('快取圖片失敗:', error);
-    }
-}
-
-// 從快取獲取圖片
-async function getCachedImage(fileName) {
-    if (!db) {
-        console.error('IndexedDB 未初始化');
-        return null;
-    }
-    try {
-        const store = db.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME);
-        const result = await store.get(fileName);
-        return result?.blob;
-    } catch (error) {
-        console.error('獲取快取圖片失敗:', error);
-        return null;
-    }
-}
-
-// 檢查快取是否過期（7天）
-function isCacheExpired(timestamp) {
-    const CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 7天
-    return Date.now() - timestamp > CACHE_DURATION;
-}
-
 // Firebase 配置
 const firebaseConfig = {
     apiKey: "AIzaSyDQZovmdN3y7AGJh9rkVZopch0ZvQG68qw",
@@ -121,6 +12,22 @@ const firebaseConfig = {
     messagingSenderId: "976883349752",
     appId: "1:976883349752:web:5eee959e782b4e95df630d"
 };
+
+// 修改 Firebase 初始化部分
+let storage;
+let db;
+
+try {
+    firebase.initializeApp(firebaseConfig);
+    storage = firebase.storage();
+    db = firebase.firestore();
+    
+    console.log('Firebase 初始化成功');
+    // 在頁面載入完成後立即載入單詞卡
+    window.addEventListener('load', loadFlashcards);
+} catch (error) {
+    console.error('Firebase 初始化失敗:', error);
+}
 
 // Google Custom Search API 配置
 const GOOGLE_API_KEY = 'AIzaSyDr_AXqYOMKlLTzqCwKzDM9o34sP3HmPS4';
@@ -157,12 +64,55 @@ async function searchImages() {
     }
 }
 
+// 添加圖片快取相關函數
+async function cacheImage(url, fileName) {
+    try {
+        const cache = await caches.open('image-cache');
+        const response = await fetch(url);
+        await cache.put(fileName, response);
+        console.log('圖片已快取:', fileName);
+    } catch (error) {
+        console.error('快取圖片失敗:', error);
+    }
+}
+
+// 添加圖片壓縮函數
+async function compressImage(blob) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
+            
+            // 計算新的尺寸，保持寬高比
+            const maxDimension = 1200; // 最大尺寸
+            if (width > height && width > maxDimension) {
+                height = Math.round((height * maxDimension) / width);
+                width = maxDimension;
+            } else if (height > maxDimension) {
+                width = Math.round((width * maxDimension) / height);
+                height = maxDimension;
+            }
+            
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            
+            // 使用較高的品質來壓縮
+            canvas.toBlob(resolve, 'image/jpeg', 0.85);
+        };
+        img.onerror = reject;
+        img.src = URL.createObjectURL(blob);
+    });
+}
+
 // 修改 saveImageToFirebase 函數
 async function saveImageToFirebase(imageUrl, searchTerm) {
     try {
         console.log('開始儲存圖片:', imageUrl);
         
-        // 生成檔案名稱
         const fileName = `${searchTerm}_${Date.now()}.jpg`;
         
         // 获取图片数据
@@ -171,7 +121,6 @@ async function saveImageToFirebase(imageUrl, searchTerm) {
             const response = await fetch(imageUrl);
             blob = await response.blob();
         } else {
-            // 如果是网络图片，使用 img 元素加载
             blob = await new Promise((resolve, reject) => {
                 const img = new Image();
                 img.crossOrigin = 'anonymous';
@@ -184,7 +133,6 @@ async function saveImageToFirebase(imageUrl, searchTerm) {
                     canvas.toBlob(resolve, 'image/jpeg', 0.95);
                 };
                 img.onerror = () => {
-                    console.log('图片加载失败，尝试直接获取...');
                     fetch(imageUrl)
                         .then(response => response.blob())
                         .then(resolve)
@@ -201,9 +149,6 @@ async function saveImageToFirebase(imageUrl, searchTerm) {
         // 壓縮圖片
         const compressedBlob = await compressImage(blob);
         
-        // 快取壓縮後的圖片
-        await cacheImage(fileName, compressedBlob);
-
         // 上传到 Firebase Storage
         const imageRef = storage.ref(`images/${fileName}`);
         const uploadTask = imageRef.put(compressedBlob, {
@@ -223,6 +168,9 @@ async function saveImageToFirebase(imageUrl, searchTerm) {
         
         await uploadTask;
         const downloadUrl = await imageRef.getDownloadURL();
+        
+        // 快取圖片
+        await cacheImage(downloadUrl, fileName);
         
         // 创建单词卡
         createFlashcard(downloadUrl, searchTerm, fileName);
@@ -279,14 +227,7 @@ async function loadFlashcards() {
         const flashcardsDiv = document.getElementById('flashcards');
         flashcardsDiv.innerHTML = '';
         
-        if (!storage) {
-            throw new Error('Firebase Storage 未初始化');
-        }
-        
-        // 獲取 Storage 中 images 資料夾的引用
         const imagesRef = storage.ref('images');
-        
-        // 列出所有圖片
         const imagesList = await imagesRef.listAll();
         console.log('找到 ' + imagesList.items.length + ' 張圖片');
         
@@ -296,38 +237,49 @@ async function loadFlashcards() {
             return;
         }
 
-        // 顯示所有圖片
+        // 檢查快取是否可用
+        const cacheAvailable = 'caches' in window;
+        
         for (const imageRef of imagesList.items) {
+            const fileName = imageRef.name;
+            const word = fileName.split('_')[0];
+            
             try {
-                const fileName = imageRef.name;
-                const word = fileName.split('_')[0];
-                
-                // 嘗試從快取獲取圖片
                 let imageUrl;
-                const cachedImage = await getCachedImage(fileName);
                 
-                if (cachedImage) {
-                    imageUrl = URL.createObjectURL(cachedImage);
+                if (cacheAvailable) {
+                    // 嘗試從快取獲取圖片
+                    const cache = await caches.open('image-cache');
+                    const cachedResponse = await cache.match(fileName);
+                    
+                    if (cachedResponse) {
+                        console.log('從快取載入圖片:', fileName);
+                        imageUrl = URL.createObjectURL(await cachedResponse.blob());
+                    } else {
+                        // 如果快取中沒有，從 Firebase 下載並快取
+                        console.log('從 Firebase 下載並快取圖片:', fileName);
+                        imageUrl = await imageRef.getDownloadURL();
+                        await cacheImage(imageUrl, fileName);
+                    }
                 } else {
-                    // 如果快取中沒有，則從 Firebase 下載
+                    // 如果快取不可用，直接從 Firebase 下載
+                    console.log('從 Firebase 下載圖片:', fileName);
                     imageUrl = await imageRef.getDownloadURL();
-                    // 下載後快取
-                    const response = await fetch(imageUrl);
-                    const blob = await response.blob();
-                    await cacheImage(fileName, blob);
                 }
                 
-                console.log('載入圖片:', fileName);
                 createFlashcard(imageUrl, word, fileName);
             } catch (error) {
-                console.error('載入單張圖片失敗:', error);
-                continue; // 繼續處理下一張圖片
+                console.error('載入圖片失敗:', fileName, error);
+                // 如果載入失敗，顯示錯誤訊息
+                const errorCard = document.createElement('div');
+                errorCard.className = 'flashcard error';
+                errorCard.innerHTML = `<p>載入失敗: ${word}</p>`;
+                flashcardsDiv.appendChild(errorCard);
             }
         }
     } catch (error) {
         console.error('載入單詞卡時發生錯誤：', error);
-        const flashcardsDiv = document.getElementById('flashcards');
-        flashcardsDiv.innerHTML = '<p>載入單詞卡失敗，請檢查網路連接並重新整理頁面</p>';
+        alert('載入單詞卡失敗：' + error.message);
     }
 }
 
@@ -632,29 +584,4 @@ function showTemporaryMessage(message, type = 'success') {
         messageDiv.classList.add('fade-out');
         setTimeout(() => messageDiv.remove(), 500);
     }, 2000);
-}
-
-// 在 DOMContentLoaded 事件中初始化
-document.addEventListener('DOMContentLoaded', async () => {
-    try {
-        // 先初始化 IndexedDB
-        await initDB();
-        console.log('IndexedDB 初始化成功');
-        
-        // 再初始化 Firebase
-        const firebaseInitialized = await initFirebase();
-        if (firebaseInitialized) {
-            // 載入單詞卡
-            await loadFlashcards();
-        } else {
-            throw new Error('Firebase 初始化失敗');
-        }
-    } catch (error) {
-        console.error('初始化失敗:', error);
-        const flashcardsDiv = document.getElementById('flashcards');
-        flashcardsDiv.innerHTML = '<p>系統初始化失敗，請重新整理頁面</p>';
-    }
-    
-    // 添加其他事件監聽器
-    document.getElementById('searchButton').addEventListener('click', searchImages);
-}); 
+} 
