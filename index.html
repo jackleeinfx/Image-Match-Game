@@ -41,10 +41,12 @@
         </div>
 
         <div class="search-section" id="controlSection">
-            <input type="text" id="searchInput" placeholder="請輸入搜尋關鍵字">
-            <button id="prevPage" class="page-button">←</button>
-            <button id="searchButton">搜尋圖片</button>
-            <button id="nextPage" class="page-button">→</button>
+            <form id="searchForm" onsubmit="return false;">
+                <input type="text" id="searchInput" placeholder="請輸入搜尋關鍵字">
+                <button type="button" id="prevPage" class="page-button">←</button>
+                <button type="button" id="searchButton">搜尋圖片</button>
+                <button type="button" id="nextPage" class="page-button">→</button>
+            </form>
         </div>
         
         <div id="dropZone" class="drop-zone">

@@ -496,37 +496,67 @@ body {
 
 /* 改進圖片載入指示器樣式 */
 .loading-indicator {
-    position: absolute;
-    top: 0;
-    left: 0;
+    position: relative;
     width: 100%;
-    height: 100%;
+    height: 60px;
     display: flex;
     align-items: center;
     justify-content: center;
     background-color: #2d2d2d;
     color: #e0e0e0;
     font-size: 14px;
-    z-index: 1;
-    animation: pulse 1.5s infinite ease-in-out;
+    margin: 20px 0;
+    border-radius: 5px;
+    padding: 10px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+/* 圖片容器內的載入指示器保持絕對定位 */
+.image-container .loading-indicator {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    margin: 0;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 0;
+}
+
+/* 添加載入動畫樣式 */
+.loading-spinner {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 3px solid rgba(255, 255, 255, 0.2);
+    border-top-color: #e0e0e0;
+    animation: spin 1s infinite linear;
+    margin-right: 12px;
+}
+
+.loading-indicator span {
+    font-size: 15px;
+    letter-spacing: 0.5px;
+}
+
+/* 錯誤圖標樣式 */
+.error-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    background-color: #e53e3e;
+    color: white;
+    border-radius: 50%;
+    margin-right: 10px;
+    font-weight: bold;
 }
 
 @keyframes pulse {
     0% { background-color: #2d2d2d; }
     50% { background-color: #3d3d3d; }
     100% { background-color: #2d2d2d; }
-}
-
-.loading-indicator::before {
-    content: '';
-    width: 20px;
-    height: 20px;
-    margin-right: 10px;
-    border-radius: 50%;
-    border: 2px solid #e0e0e0;
-    border-top-color: transparent;
-    animation: spin 1s infinite linear;
-    display: inline-block;
 }
 
 @keyframes spin {
@@ -540,15 +570,9 @@ body {
     animation: none;
 }
 
-.loading-indicator.error::before {
-    content: '!';
-    width: auto;
-    height: auto;
-    margin-right: 5px;
-    border: none;
-    animation: none;
-    font-weight: bold;
-    font-size: 18px;
+/* 添加搜尋結果區域過渡動畫 */
+#searchResults {
+    transition: all 0.3s ease-in-out;
 }
 
 /* 添加搜尋結果錯誤訊息樣式 */
@@ -581,5 +605,16 @@ body {
 .image-container.load-failed {
     background-color: #2d2d2d;
     border: 1px dashed #e53e3e;
+}
+
+/* 添加搜尋結果計數樣式 */
+.result-count {
+    font-size: 14px;
+    color: #a0aec0;
+    margin-bottom: 15px;
+    padding: 5px 10px;
+    background-color: #2d2d2d;
+    border-radius: 4px;
+    display: inline-block;
 }
   
