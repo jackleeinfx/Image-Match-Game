@@ -44,9 +44,13 @@ let totalPages = 1;
 
 // 在searchImages函數前添加備用的圖片代理服務列表
 const proxyServices = [
-    'https://cors-anywhere.herokuapp.com/',
+    'https://corsproxy.io/?',
     'https://api.allorigins.win/raw?url=',
-    'https://corsproxy.io/?'
+    'https://cors-anywhere.herokuapp.com/',
+    'https://crossorigin.me/',
+    'https://images1-focus-opensocial.googleusercontent.com/gadgets/proxy?container=focus&refresh=2592000&url=',
+    'https://yacdn.org/proxy/',
+    'https://thingproxy.freeboard.io/fetch/'
 ];
 
 // 使用多個代理服務嘗試獲取圖片
@@ -54,7 +58,19 @@ async function fetchWithProxies(url, attempt = 0) {
     // 如果已嘗試所有代理服務，則直接返回原始URL
     if (attempt >= proxyServices.length) {
         console.log('所有代理服務均失敗，使用原始URL');
-        return fetch(url, { mode: 'no-cors' });
+        try {
+            // 最後一次嘗試，用原始URL但不啟用CORS模式
+            return fetch(url, { 
+                mode: 'no-cors',
+                cache: 'no-cache',
+                headers: {
+                    'Access-Control-Allow-Origin': '*'
+                }
+            });
+        } catch (finalError) {
+            console.error('使用原始URL請求失敗:', finalError);
+            throw new Error('無法獲取圖片');
+        }
     }
     
     try {
@@ -62,9 +78,13 @@ async function fetchWithProxies(url, attempt = 0) {
         console.log(`嘗試使用代理 ${attempt + 1}/${proxyServices.length}: ${proxyServices[attempt]}`);
         
         const response = await fetch(proxyUrl, {
+            method: 'GET',
             headers: {
-                'X-Requested-With': 'XMLHttpRequest'
-            }
+                'X-Requested-With': 'XMLHttpRequest',
+                'Access-Control-Allow-Origin': '*'
+            },
+            referrerPolicy: 'no-referrer',
+            cache: 'no-cache'
         });
         
         if (!response.ok) {
@@ -97,6 +117,10 @@ async function searchImages(page = 1) {
         return;
     }
 
+    // 顯示載入中狀態
+    const resultsDiv = document.getElementById('searchResults');
+    resultsDiv.innerHTML = '<div class="loading-indicator">正在搜尋圖片...</div>';
+
     // 添加更多搜尋參數以獲取更高質量的圖片
     const url = `https://www.googleapis.com/customsearch/v1?key=${GOOGLE_API_KEY}&cx=${SEARCH_ENGINE_ID}&searchType=image&q=${encodeURIComponent(searchTerm)}&start=${startIndex}&imgSize=large&imgType=photo&safe=active&fields=items(title,link,image/thumbnailLink),searchInformation/totalResults`;
 
@@ -113,16 +137,18 @@ async function searchImages(page = 1) {
         if (data.error) {
             console.error('Google API 錯誤：', data.error);
             alert(`搜尋錯誤：${data.error.message}`);
+            resultsDiv.innerHTML = `<div class="error-message">搜尋錯誤：${data.error.message}</div>`;
             return;
         }
         
         if (!data.items || data.items.length === 0) {
             alert('沒有找到相關圖片');
+            resultsDiv.innerHTML = `<div class="error-message">沒有找到相關圖片</div>`;
             return;
         }
 
         // 計算總頁數，確保不會出現 NaN
-        const totalResults = parseInt(data.searchInformation.totalResults) || 0;
+        const totalResults = parseInt(data.searchInformation?.totalResults) || 0;
         totalPages = Math.max(1, Math.ceil(Math.min(totalResults, 100) / 10)); // Google API 限制最多100個結果
         
         // 更新換頁按鈕狀態
@@ -130,20 +156,47 @@ async function searchImages(page = 1) {
         
         console.log('搜尋結果：', data);
         
-        // 預處理圖片數據，確保每個項目都有縮略圖
-        const processedItems = data.items.map(item => {
-            // 如果沒有縮略圖，使用原始圖片連結作為縮略圖
-            if (!item.image || !item.image.thumbnailLink) {
-                item.image = item.image || {};
-                item.image.thumbnailLink = item.link;
-            }
-            return item;
-        });
+        // 預處理圖片數據，確保每個項目都有縮略圖並過濾無效的項目
+        const processedItems = data.items
+            .filter(item => item && item.link)
+            .map(item => {
+                // 創建新對象，避免修改原始數據
+                const processedItem = { ...item };
+                
+                // 確保縮略圖存在
+                if (!processedItem.image || !processedItem.image.thumbnailLink) {
+                    processedItem.image = processedItem.image || {};
+                    processedItem.image.thumbnailLink = processedItem.link;
+                }
+                
+                // 檢查URL是否有效
+                try {
+                    new URL(processedItem.link);
+                    new URL(processedItem.image.thumbnailLink);
+                } catch (e) {
+                    console.warn('發現無效URL:', processedItem.link, e);
+                    // 如果URL無效，可能需要修復或添加前綴
+                    if (!processedItem.link.startsWith('http')) {
+                        processedItem.link = 'https://' + processedItem.link;
+                    }
+                    if (!processedItem.image.thumbnailLink.startsWith('http')) {
+                        processedItem.image.thumbnailLink = 'https://' + processedItem.image.thumbnailLink;
+                    }
+                }
+                
+                return processedItem;
+            });
+        
+        if (processedItems.length === 0) {
+            resultsDiv.innerHTML = `<div class="error-message">處理圖片數據後沒有有效結果</div>`;
+            return;
+        }
         
         displaySearchResults(processedItems, searchTerm);
     } catch (error) {
         console.error('搜尋圖片時發生錯誤', error);
         alert('搜尋過程中發生錯誤: ' + error.message);
+        resultsDiv.innerHTML = `<div class="error-message">搜尋失敗：${error.message}</div>`;
     }
 }
 
@@ -372,6 +425,7 @@ function displaySearchResults(images, searchTerm) {
         const img = document.createElement('img');
         img.alt = searchTerm;
         img.style.display = 'none'; // 初始隱藏圖片
+        img.crossOrigin = 'anonymous'; // 添加跨域屬性
         
         // 圖片載入完成時的處理
         img.onload = () => {
@@ -383,14 +437,42 @@ function displaySearchResults(images, searchTerm) {
         img.onerror = () => {
             console.error('圖片載入失敗:', image.link);
             
-            // 使用圖片的縮略圖URL代替原始URL
-            if (image.image && image.image.thumbnailLink) {
-                console.log('嘗試使用縮略圖:', image.image.thumbnailLink);
-                img.src = image.image.thumbnailLink;
-            } else {
-                loadingIndicator.textContent = '圖片無法載入';
-                loadingIndicator.className = 'loading-indicator error';
-            }
+            // 嘗試使用代理服務加載圖片
+            const tryLoadWithProxy = async () => {
+                for (let i = 0; i < proxyServices.length; i++) {
+                    try {
+                        console.log(`嘗試使用代理 ${i + 1} 載入圖片:`, proxyServices[i]);
+                        const proxyUrl = proxyServices[i] + encodeURIComponent(image.link);
+                        
+                        // 使用新圖片元素測試加載
+                        const testImg = new Image();
+                        testImg.crossOrigin = 'anonymous';
+                        
+                        await new Promise((resolve, reject) => {
+                            testImg.onload = resolve;
+                            testImg.onerror = reject;
+                            testImg.src = proxyUrl;
+                        });
+                        
+                        // 如果成功加載，則更新原圖片
+                        img.src = proxyUrl;
+                        return;
+                    } catch (error) {
+                        console.warn(`代理 ${i + 1} 載入失敗:`, error);
+                    }
+                }
+                
+                // 如果所有代理都失敗，嘗試使用縮略圖
+                if (image.image && image.image.thumbnailLink) {
+                    console.log('嘗試使用縮略圖:', image.image.thumbnailLink);
+                    img.src = image.image.thumbnailLink;
+                } else {
+                    loadingIndicator.textContent = '圖片無法載入';
+                    loadingIndicator.className = 'loading-indicator error';
+                }
+            };
+            
+            tryLoadWithProxy();
         };
         
         // 設置圖片源，添加時間戳避免快取問題
@@ -418,7 +500,7 @@ function displaySearchResults(images, searchTerm) {
                     // 設置載入超時
                     const timeoutId = setTimeout(() => {
                         reject(new Error('圖片載入超時'));
-                    }, 10000); // 10秒超時
+                    }, 10000);
                     
                     tempImg.onload = () => {
                         clearTimeout(timeoutId);
@@ -448,20 +530,45 @@ function displaySearchResults(images, searchTerm) {
                         // 使用高品質繪製
                         ctx.imageSmoothingEnabled = true;
                         ctx.imageSmoothingQuality = 'high';
-                        ctx.drawImage(tempImg, 0, 0, width, height);
-                        resolve();
+                        
+                        try {
+                            ctx.drawImage(tempImg, 0, 0, width, height);
+                            resolve();
+                        } catch (e) {
+                            reject(new Error('繪製圖片失敗: ' + e.message));
+                        }
                     };
                     
                     tempImg.onerror = () => {
                         clearTimeout(timeoutId);
                         
-                        // 如果原始圖片加載失敗，嘗試使用縮略圖
-                        if (image.image && image.image.thumbnailLink) {
-                            console.log('原始圖片載入失敗，嘗試使用縮略圖');
-                            tempImg.src = image.image.thumbnailLink;
-                        } else {
-                            reject(new Error('無法載入圖片'));
-                        }
+                        // 如果原始圖片加載失敗，嘗試使用代理
+                        const tryLoadWithProxy = async () => {
+                            for (let i = 0; i < proxyServices.length; i++) {
+                                try {
+                                    console.log(`嘗試通過代理 ${i + 1} 保存圖片`);
+                                    const proxyUrl = proxyServices[i] + encodeURIComponent(img.src);
+                                    tempImg.src = proxyUrl;
+                                    // 等待一點時間讓新的src加載
+                                    await new Promise(r => setTimeout(r, 1000));
+                                    if (tempImg.complete && tempImg.naturalWidth > 0) {
+                                        return;
+                                    }
+                                } catch (e) {
+                                    console.warn(`代理 ${i + 1} 載入失敗:`, e);
+                                }
+                            }
+                            
+                            // 如果代理都失敗，嘗試縮略圖
+                            if (image.image && image.image.thumbnailLink) {
+                                console.log('原始圖片載入失敗，嘗試使用縮略圖');
+                                tempImg.src = image.image.thumbnailLink;
+                            } else {
+                                reject(new Error('無法載入圖片'));
+                            }
+                        };
+                        
+                        tryLoadWithProxy();
                     };
                     
                     // 嘗試載入當前顯示的圖片
