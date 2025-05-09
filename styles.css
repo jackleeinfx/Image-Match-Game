@@ -104,12 +104,30 @@ body {
     position: relative;
     width: 100%;
     height: 200px;
+    background-color: #2d2d2d;
+    overflow: hidden;
+}
+
+/* 確保圖片載入前容器有合適的大小 */
+.image-container::before {
+    content: '';
+    display: block;
+    padding-top: 75%; /* 保持4:3比例 */
 }
 
 .image-container img {
+    position: absolute;
+    top: 0;
+    left: 0;
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain;
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+}
+
+.image-container img[style*="display: block"] {
+    opacity: 1;
 }
 
 .save-button {
@@ -123,7 +141,8 @@ body {
     border-radius: 4px;
     cursor: pointer;
     opacity: 0;
-    transition: opacity 0.3s;
+    transition: opacity 0.3s, background-color 0.3s;
+    z-index: 2; /* 確保按鈕在載入指示器上方 */
 }
 
 .image-container:hover .save-button {
@@ -132,6 +151,16 @@ body {
 
 .save-button:hover {
     background-color: #2b4c7e;
+}
+
+.save-button:disabled {
+    background-color: #4a5568;
+    cursor: not-allowed;
+    opacity: 1 !important; /* 確保禁用狀態下仍然可見 */
+}
+
+.save-button[disabled]:hover {
+    background-color: #4a5568;
 }
 
 .delete-button {
@@ -463,5 +492,62 @@ body {
 .page-button:disabled {
     background-color: #4a5568;
     cursor: not-allowed;
+}
+
+/* 改進圖片載入指示器樣式 */
+.loading-indicator {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #2d2d2d;
+    color: #e0e0e0;
+    font-size: 14px;
+    z-index: 1;
+    animation: pulse 1.5s infinite ease-in-out;
+}
+
+@keyframes pulse {
+    0% { background-color: #2d2d2d; }
+    50% { background-color: #3d3d3d; }
+    100% { background-color: #2d2d2d; }
+}
+
+.loading-indicator::before {
+    content: '';
+    width: 20px;
+    height: 20px;
+    margin-right: 10px;
+    border-radius: 50%;
+    border: 2px solid #e0e0e0;
+    border-top-color: transparent;
+    animation: spin 1s infinite linear;
+    display: inline-block;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.loading-indicator.error {
+    color: #e53e3e;
+    background-color: rgba(45, 45, 45, 0.9);
+    animation: none;
+}
+
+.loading-indicator.error::before {
+    content: '!';
+    width: auto;
+    height: auto;
+    margin-right: 5px;
+    border: none;
+    animation: none;
+    font-weight: bold;
+    font-size: 18px;
 }
   

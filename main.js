@@ -42,6 +42,43 @@ let currentPage = 1;
 let currentSearchTerm = '';
 let totalPages = 1;
 
+// 在searchImages函數前添加備用的圖片代理服務列表
+const proxyServices = [
+    'https://cors-anywhere.herokuapp.com/',
+    'https://api.allorigins.win/raw?url=',
+    'https://corsproxy.io/?'
+];
+
+// 使用多個代理服務嘗試獲取圖片
+async function fetchWithProxies(url, attempt = 0) {
+    // 如果已嘗試所有代理服務，則直接返回原始URL
+    if (attempt >= proxyServices.length) {
+        console.log('所有代理服務均失敗，使用原始URL');
+        return fetch(url, { mode: 'no-cors' });
+    }
+    
+    try {
+        const proxyUrl = proxyServices[attempt] + encodeURIComponent(url);
+        console.log(`嘗試使用代理 ${attempt + 1}/${proxyServices.length}: ${proxyServices[attempt]}`);
+        
+        const response = await fetch(proxyUrl, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`代理服務 ${attempt + 1} 失敗`);
+        }
+        
+        return response;
+    } catch (error) {
+        console.warn(`代理 ${attempt + 1} 失敗:`, error);
+        // 嘗試下一個代理服務
+        return fetchWithProxies(url, attempt + 1);
+    }
+}
+
 // 修改 searchImages 函數
 async function searchImages(page = 1) {
     const searchTerm = document.getElementById('searchInput').value.trim();
@@ -60,11 +97,17 @@ async function searchImages(page = 1) {
         return;
     }
 
-    const url = `https://www.googleapis.com/customsearch/v1?key=${GOOGLE_API_KEY}&cx=${SEARCH_ENGINE_ID}&searchType=image&q=${encodeURIComponent(searchTerm)}&start=${startIndex}`;
+    // 添加更多搜尋參數以獲取更高質量的圖片
+    const url = `https://www.googleapis.com/customsearch/v1?key=${GOOGLE_API_KEY}&cx=${SEARCH_ENGINE_ID}&searchType=image&q=${encodeURIComponent(searchTerm)}&start=${startIndex}&imgSize=large&imgType=photo&safe=active&fields=items(title,link,image/thumbnailLink),searchInformation/totalResults`;
 
     try {
         console.log('開始搜尋:', url);
         const response = await fetch(url);
+        
+        if (!response.ok) {
+            throw new Error(`API響應錯誤: ${response.status} ${response.statusText}`);
+        }
+        
         const data = await response.json();
         
         if (data.error) {
@@ -80,16 +123,27 @@ async function searchImages(page = 1) {
 
         // 計算總頁數，確保不會出現 NaN
         const totalResults = parseInt(data.searchInformation.totalResults) || 0;
-        totalPages = Math.max(1, Math.ceil(totalResults / 10));
+        totalPages = Math.max(1, Math.ceil(Math.min(totalResults, 100) / 10)); // Google API 限制最多100個結果
         
         // 更新換頁按鈕狀態
         updatePageButtons();
         
         console.log('搜尋結果：', data);
-        displaySearchResults(data.items, searchTerm);
+        
+        // 預處理圖片數據，確保每個項目都有縮略圖
+        const processedItems = data.items.map(item => {
+            // 如果沒有縮略圖，使用原始圖片連結作為縮略圖
+            if (!item.image || !item.image.thumbnailLink) {
+                item.image = item.image || {};
+                item.image.thumbnailLink = item.link;
+            }
+            return item;
+        });
+        
+        displaySearchResults(processedItems, searchTerm);
     } catch (error) {
         console.error('搜尋圖片時發生錯誤', error);
-        alert('搜尋過程中發生錯誤，請檢查控制台');
+        alert('搜尋過程中發生錯誤: ' + error.message);
     }
 }
 
@@ -186,24 +240,36 @@ async function saveImageToFirebase(imageUrl, searchTerm) {
         
         const fileName = `${searchTerm}_${Date.now()}.jpg`;
         
+        // 移除可能的現有代理前綴
+        let cleanImageUrl = imageUrl;
+        proxyServices.forEach(proxy => {
+            if (cleanImageUrl.includes(proxy)) {
+                cleanImageUrl = decodeURIComponent(cleanImageUrl.split(proxy)[1]);
+            }
+        });
+        
         // 获取图片数据
         let blob;
         try {
             // 先嘗試直接獲取圖片
-            const response = await fetch(imageUrl, {
-                mode: 'cors',
-                headers: {
-                    'Access-Control-Allow-Origin': '*'
-                }
+            let response = await fetch(cleanImageUrl, {
+                mode: 'no-cors',
+                cache: 'no-cache'
             });
             
             if (!response.ok) {
-                throw new Error('直接獲取圖片失敗');
+                // 如果直接獲取失敗，嘗試使用代理
+                console.log('直接獲取圖片失敗，嘗試使用代理');
+                response = await fetchWithProxies(cleanImageUrl);
+            }
+            
+            if (!response.ok) {
+                throw new Error('無法獲取圖片數據');
             }
             
             blob = await response.blob();
         } catch (error) {
-            console.log('直接獲取失敗，嘗試使用圖片元素獲取:', error);
+            console.log('使用fetch獲取失敗，嘗試使用圖片元素獲取:', error);
             
             // 如果直接獲取失敗，使用圖片元素獲取
             blob = await new Promise((resolve, reject) => {
@@ -225,11 +291,22 @@ async function saveImageToFirebase(imageUrl, searchTerm) {
                 };
                 
                 img.onerror = () => {
-                    reject(new Error('圖片載入失敗'));
+                    // 嘗試使用所有代理
+                    fetchWithProxies(cleanImageUrl).then(response => {
+                        if (response.ok) {
+                            return response.blob();
+                        } else {
+                            throw new Error('使用代理獲取圖片失敗');
+                        }
+                    }).then(imgBlob => {
+                        img.src = URL.createObjectURL(imgBlob);
+                    }).catch(() => {
+                        reject(new Error('圖片載入失敗'));
+                    });
                 };
                 
                 // 添加時間戳避免快取問題
-                img.src = imageUrl + (imageUrl.includes('?') ? '&' : '?') + 't=' + Date.now();
+                img.src = cleanImageUrl + (cleanImageUrl.includes('?') ? '&' : '?') + 't=' + Date.now();
             });
         }
 
@@ -286,10 +363,38 @@ function displaySearchResults(images, searchTerm) {
         const imgContainer = document.createElement('div');
         imgContainer.className = 'image-container';
         
+        // 添加載入指示器
+        const loadingIndicator = document.createElement('div');
+        loadingIndicator.className = 'loading-indicator';
+        loadingIndicator.textContent = '載入中...';
+        imgContainer.appendChild(loadingIndicator);
+        
         const img = document.createElement('img');
-        img.src = image.link;
         img.alt = searchTerm;
-        img.crossOrigin = 'anonymous'; // 添加跨域支援
+        img.style.display = 'none'; // 初始隱藏圖片
+        
+        // 圖片載入完成時的處理
+        img.onload = () => {
+            loadingIndicator.remove();
+            img.style.display = 'block';
+        };
+        
+        // 圖片載入失敗時的處理
+        img.onerror = () => {
+            console.error('圖片載入失敗:', image.link);
+            
+            // 使用圖片的縮略圖URL代替原始URL
+            if (image.image && image.image.thumbnailLink) {
+                console.log('嘗試使用縮略圖:', image.image.thumbnailLink);
+                img.src = image.image.thumbnailLink;
+            } else {
+                loadingIndicator.textContent = '圖片無法載入';
+                loadingIndicator.className = 'loading-indicator error';
+            }
+        };
+        
+        // 設置圖片源，添加時間戳避免快取問題
+        img.src = image.link + (image.link.includes('?') ? '&' : '?') + 't=' + Date.now();
         
         const saveButton = document.createElement('button');
         saveButton.className = 'save-button';
@@ -300,7 +405,127 @@ function displaySearchResults(images, searchTerm) {
             try {
                 saveButton.disabled = true;
                 saveButton.textContent = '儲存中...';
-                await saveImageToFirebase(image.link, searchTerm);
+                
+                // 創建一個canvas來繪製圖片，避免跨域問題
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                // 等待圖片加載完成
+                await new Promise((resolve, reject) => {
+                    const tempImg = new Image();
+                    tempImg.crossOrigin = 'anonymous';
+                    
+                    // 設置載入超時
+                    const timeoutId = setTimeout(() => {
+                        reject(new Error('圖片載入超時'));
+                    }, 10000); // 10秒超時
+                    
+                    tempImg.onload = () => {
+                        clearTimeout(timeoutId);
+                        
+                        // 檢查圖片是否有效
+                        if (tempImg.width === 0 || tempImg.height === 0) {
+                            reject(new Error('載入的圖片無效'));
+                            return;
+                        }
+                        
+                        // 設置合理的canvas尺寸
+                        const maxDimension = 1200;
+                        let width = tempImg.width;
+                        let height = tempImg.height;
+                        
+                        if (width > height && width > maxDimension) {
+                            height = Math.round((height * maxDimension) / width);
+                            width = maxDimension;
+                        } else if (height > maxDimension) {
+                            width = Math.round((width * maxDimension) / height);
+                            height = maxDimension;
+                        }
+                        
+                        canvas.width = width;
+                        canvas.height = height;
+                        
+                        // 使用高品質繪製
+                        ctx.imageSmoothingEnabled = true;
+                        ctx.imageSmoothingQuality = 'high';
+                        ctx.drawImage(tempImg, 0, 0, width, height);
+                        resolve();
+                    };
+                    
+                    tempImg.onerror = () => {
+                        clearTimeout(timeoutId);
+                        
+                        // 如果原始圖片加載失敗，嘗試使用縮略圖
+                        if (image.image && image.image.thumbnailLink) {
+                            console.log('原始圖片載入失敗，嘗試使用縮略圖');
+                            tempImg.src = image.image.thumbnailLink;
+                        } else {
+                            reject(new Error('無法載入圖片'));
+                        }
+                    };
+                    
+                    // 嘗試載入當前顯示的圖片
+                    tempImg.src = img.src;
+                });
+                
+                // 從canvas獲取圖片數據
+                const blob = await new Promise((resolve, reject) => {
+                    try {
+                        canvas.toBlob(blob => {
+                            if (!blob || blob.size === 0) {
+                                reject(new Error('生成的圖片數據無效'));
+                            } else {
+                                resolve(blob);
+                            }
+                        }, 'image/jpeg', 0.92); // 提高品質
+                    } catch (error) {
+                        reject(new Error('轉換圖片格式失敗: ' + error.message));
+                    }
+                });
+                
+                // 檢查blob大小，過小可能表示圖片無效
+                if (blob.size < 1024) { // 小於1KB
+                    throw new Error('圖片數據過小，可能無效');
+                }
+                
+                // 直接使用blob儲存到Firebase
+                const fileName = `${searchTerm}_${Date.now()}.jpg`;
+                const imageRef = storage.ref(`images/${fileName}`);
+                
+                // 顯示上傳進度
+                const uploadTask = imageRef.put(blob, { contentType: 'image/jpeg' });
+                uploadTask.on('state_changed', 
+                    (snapshot) => {
+                        const progress = Math.round(
+                            (snapshot.bytesTransferred / snapshot.totalBytes) * 100
+                        );
+                        saveButton.textContent = `上傳中 ${progress}%`;
+                    },
+                    (error) => {
+                        throw new Error('上傳失敗: ' + error.message);
+                    }
+                );
+                
+                await uploadTask;
+                const downloadUrl = await imageRef.getDownloadURL();
+                
+                // 快取圖片
+                try {
+                    await cacheImage(downloadUrl, fileName);
+                } catch (cacheError) {
+                    console.warn('快取圖片失敗，但不影響儲存:', cacheError);
+                }
+                
+                // 創建單詞卡
+                createFlashcard(downloadUrl, searchTerm, fileName);
+                
+                saveButton.textContent = '已儲存';
+                showTemporaryMessage('圖片已成功儲存！');
+                
+                setTimeout(() => {
+                    saveButton.disabled = false;
+                    saveButton.textContent = '儲存圖片';
+                }, 2000);
             } catch (error) {
                 console.error('儲存圖片時發生錯誤：', error);
                 saveButton.textContent = '儲存失敗';
@@ -308,6 +533,7 @@ function displaySearchResults(images, searchTerm) {
                     saveButton.disabled = false;
                     saveButton.textContent = '儲存圖片';
                 }, 2000);
+                showTemporaryMessage('儲存失敗：' + error.message, 'error');
             }
         });
         
