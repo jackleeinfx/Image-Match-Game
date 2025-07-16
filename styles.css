@@ -245,6 +245,35 @@ body {
     background-color: #2b4c7e;
 }
 
+/* 排序控制區域樣式 */
+.sort-controls {
+    margin-top: 10px;
+    display: flex;
+    gap: 5px;
+    flex-direction: column;
+    border-top: 1px solid #404040;
+    padding-top: 10px;
+}
+
+.sort-controls button {
+    padding: 5px 10px;
+    background-color: #16a085;
+    color: #e0e0e0;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.sort-controls button:hover {
+    background-color: #138d75;
+}
+
+.sort-controls button.active {
+    background-color: #0e6b5d;
+    border: 1px solid #1abc9c;
+}
+
 /* 單詞卡的新樣式 */
 .flashcard {
     cursor: pointer;
@@ -461,4 +490,20 @@ body {
     background-color: #4a5568;
     cursor: not-allowed;
 }
+
+/* 載入指示器樣式 */
+.loading-indicator {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: rgba(45, 45, 45, 0.9);
+    color: #e0e0e0;
+    padding: 10px 15px;
+    border-radius: 4px;
+    font-size: 14px;
+    z-index: 10;
+}
+
+
   

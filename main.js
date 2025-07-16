@@ -23,6 +23,14 @@ try {
     db = firebase.firestore();
     
     console.log('Firebase 初始化成功');
+    
+    // 測試Firebase連接
+    storage.ref().listAll().then(() => {
+        console.log('Firebase Storage 連接正常');
+    }).catch(error => {
+        console.error('Firebase Storage 連接失敗:', error);
+    });
+    
     // 在頁面載入完成後立即載入單詞卡
     window.addEventListener('load', loadFlashcards);
 } catch (error) {
@@ -183,8 +191,14 @@ async function preloadImage(url) {
 async function saveImageToFirebase(imageUrl, searchTerm) {
     try {
         console.log('開始儲存圖片:', imageUrl);
+        console.log('Firebase Storage 狀態:', storage ? '已初始化' : '未初始化');
         
-        const fileName = `${searchTerm}_${Date.now()}.jpg`;
+        if (!storage) {
+            throw new Error('Firebase Storage 未初始化');
+        }
+        
+        const timestamp = Date.now();
+        const fileName = `${searchTerm}_${timestamp}.jpg`;
         
         // 获取图片数据
         let blob;
@@ -238,9 +252,12 @@ async function saveImageToFirebase(imageUrl, searchTerm) {
         }
 
         // 壓縮圖片
+        console.log('開始壓縮圖片，原始大小:', blob.size);
         const compressedBlob = await compressImage(blob);
+        console.log('壓縮完成，壓縮後大小:', compressedBlob.size);
         
         // 上传到 Firebase Storage
+        console.log('開始上傳到 Firebase Storage:', fileName);
         const imageRef = storage.ref(`images/${fileName}`);
         const uploadTask = imageRef.put(compressedBlob, {
             contentType: 'image/jpeg'
@@ -258,19 +275,20 @@ async function saveImageToFirebase(imageUrl, searchTerm) {
         );
         
         await uploadTask;
+        console.log('上傳完成，取得下載連結...');
         const downloadUrl = await imageRef.getDownloadURL();
+        console.log('下載連結:', downloadUrl);
         
         // 快取圖片
         await cacheImage(downloadUrl, fileName);
         
         // 创建单词卡
-        createFlashcard(downloadUrl, searchTerm, fileName);
+        createFlashcard(downloadUrl, searchTerm, fileName, timestamp);
         
-        showTemporaryMessage('圖片已成功儲存！');
+        console.log('圖片儲存成功:', fileName);
         
     } catch (error) {
         console.error('儲存過程中發生錯誤：', error);
-        showTemporaryMessage('儲存失敗：' + error.message, 'error');
         throw error;
     }
 }
@@ -286,10 +304,38 @@ function displaySearchResults(images, searchTerm) {
         const imgContainer = document.createElement('div');
         imgContainer.className = 'image-container';
         
+        // 添加載入指示器
+        const loadingDiv = document.createElement('div');
+        loadingDiv.className = 'loading-indicator';
+        loadingDiv.textContent = '載入中...';
+        imgContainer.appendChild(loadingDiv);
+        
         const img = document.createElement('img');
         img.src = image.link;
         img.alt = searchTerm;
         img.crossOrigin = 'anonymous'; // 添加跨域支援
+        img.style.display = 'none'; // 初始隱藏圖片
+        
+        // 添加圖片載入失敗處理
+        img.addEventListener('error', () => {
+            console.log('圖片載入失敗，移除:', image.link);
+            imgDiv.remove(); // 完全移除圖片容器
+        });
+        
+        // 添加圖片載入成功處理
+        img.addEventListener('load', () => {
+            loadingDiv.style.display = 'none'; // 隱藏載入指示器
+            img.style.display = 'block'; // 顯示圖片
+            imgDiv.style.display = 'block'; // 確保容器顯示
+        });
+        
+        // 添加載入超時處理（10秒後如果還沒載入完成就移除）
+        setTimeout(() => {
+            if (!img.complete) {
+                console.log('圖片載入超時，移除:', image.link);
+                imgDiv.remove();
+            }
+        }, 10000);
         
         const saveButton = document.createElement('button');
         saveButton.className = 'save-button';
@@ -301,9 +347,19 @@ function displaySearchResults(images, searchTerm) {
                 saveButton.disabled = true;
                 saveButton.textContent = '儲存中...';
                 await saveImageToFirebase(image.link, searchTerm);
+                
+                // 成功後重置按鈕狀態並顯示提示
+                saveButton.textContent = '儲存成功';
+                showTemporaryMessage('圖片已成功儲存！');
+                setTimeout(() => {
+                    saveButton.disabled = false;
+                    saveButton.textContent = '儲存圖片';
+                }, 2000);
+                
             } catch (error) {
                 console.error('儲存圖片時發生錯誤：', error);
                 saveButton.textContent = '儲存失敗';
+                showTemporaryMessage('儲存失敗：' + error.message, 'error');
                 setTimeout(() => {
                     saveButton.disabled = false;
                     saveButton.textContent = '儲存圖片';
@@ -344,6 +400,10 @@ async function loadFlashcards() {
             const fileName = imageRef.name;
             const word = fileName.split('_')[0];
             
+            // 從文件名中提取時間戳
+            const timestampMatch = fileName.match(/_(\d+)\.jpg$/);
+            const timestamp = timestampMatch ? parseInt(timestampMatch[1]) : Date.now();
+            
             try {
                 let imageUrl;
                 
@@ -366,10 +426,10 @@ async function loadFlashcards() {
                 
                 // 預載入圖片
                 await preloadImage(imageUrl);
-                return { imageUrl, word, fileName };
+                return { imageUrl, word, fileName, timestamp };
             } catch (error) {
                 console.error('載入圖片失敗:', fileName, error);
-                return { error: true, word, fileName };
+                return { error: true, word, fileName, timestamp };
             }
         });
 
@@ -384,9 +444,19 @@ async function loadFlashcards() {
                 errorCard.innerHTML = `<p>載入失敗: ${result.word}</p>`;
                 flashcardsDiv.appendChild(errorCard);
             } else {
-                createFlashcard(result.imageUrl, result.word, result.fileName);
+                createFlashcard(result.imageUrl, result.word, result.fileName, result.timestamp);
             }
         });
+        
+        // 載入完成後套用保存的排序狀態
+        setTimeout(() => {
+            const savedSortMode = localStorage.getItem('sortMode');
+            if (savedSortMode === 'timeDesc') {
+                sortFlashcardsByTime(false);
+            } else if (savedSortMode === 'timeAsc') {
+                sortFlashcardsByTime(true);
+            }
+        }, 100);
     } catch (error) {
         console.error('載入單詞卡時發生錯誤：', error);
         alert('載入單詞卡失敗：' + error.message);
@@ -427,11 +497,13 @@ function speakWord(word) {
 }
 
 // 修改 createFlashcard 函數，添加漸進式載入效果
-function createFlashcard(imageUrl, word, fileName) {
+function createFlashcard(imageUrl, word, fileName, timestamp = Date.now()) {
     const flashcardsDiv = document.getElementById('flashcards');
     
     const card = document.createElement('div');
     card.className = 'flashcard';
+    card.dataset.timestamp = timestamp; // 添加時間戳數據屬性
+    card.dataset.fileName = fileName; // 添加文件名數據屬性
     
     const img = document.createElement('img');
     img.src = imageUrl;
@@ -552,6 +624,48 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('viewMode', 'complete-mode');
     }
 
+    // 添加排序按鈕事件監聽器
+    const sortByTimeDescBtn = document.getElementById('sortByTimeDesc');
+    const sortByTimeAscBtn = document.getElementById('sortByTimeAsc');
+    
+    if (sortByTimeDescBtn) {
+        sortByTimeDescBtn.addEventListener('click', () => {
+            sortFlashcardsByTime(false); // 最新優先
+            
+            // 更新按鈕狀態
+            document.querySelectorAll('.sort-controls button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            sortByTimeDescBtn.classList.add('active');
+            
+            // 保存排序狀態
+            localStorage.setItem('sortMode', 'timeDesc');
+        });
+    }
+    
+    if (sortByTimeAscBtn) {
+        sortByTimeAscBtn.addEventListener('click', () => {
+            sortFlashcardsByTime(true); // 最舊優先
+            
+            // 更新按鈕狀態
+            document.querySelectorAll('.sort-controls button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            sortByTimeAscBtn.classList.add('active');
+            
+            // 保存排序狀態
+            localStorage.setItem('sortMode', 'timeAsc');
+        });
+    }
+    
+    // 載入保存的排序狀態
+    const savedSortMode = localStorage.getItem('sortMode');
+    if (savedSortMode === 'timeDesc') {
+        sortByTimeDescBtn.classList.add('active');
+    } else if (savedSortMode === 'timeAsc') {
+        sortByTimeAscBtn.classList.add('active');
+    }
+
     // 添加設定面板折疊功能
     const toggleButton = document.getElementById('toggleSettings');
     const settings = document.querySelector('.settings');
@@ -669,6 +783,42 @@ function shuffleFlashcards() {
             const j = Math.floor(Math.random() * (i + 1));
             flashcardsContainer.appendChild(flashcards[j]);
         }
+        
+        flashcardsContainer.style.opacity = '1';
+        
+        // 移除排序按鈕的active狀態
+        document.querySelectorAll('.sort-controls button').forEach(btn => {
+            btn.classList.remove('active');
+        });
+    }, 300);
+}
+
+// 添加時間排序功能
+function sortFlashcardsByTime(ascending = false) {
+    const flashcardsContainer = document.getElementById('flashcards');
+    const flashcards = Array.from(flashcardsContainer.children);
+    
+    // 過濾掉錯誤卡片，只排序正常的卡片
+    const normalCards = flashcards.filter(card => !card.classList.contains('error'));
+    const errorCards = flashcards.filter(card => card.classList.contains('error'));
+    
+    flashcardsContainer.style.opacity = '0';
+    
+    setTimeout(() => {
+        // 按時間戳排序
+        normalCards.sort((a, b) => {
+            const timestampA = parseInt(a.dataset.timestamp) || 0;
+            const timestampB = parseInt(b.dataset.timestamp) || 0;
+            
+            return ascending ? timestampA - timestampB : timestampB - timestampA;
+        });
+        
+        // 清空容器
+        flashcardsContainer.innerHTML = '';
+        
+        // 重新添加排序後的卡片
+        normalCards.forEach(card => flashcardsContainer.appendChild(card));
+        errorCards.forEach(card => flashcardsContainer.appendChild(card));
         
         flashcardsContainer.style.opacity = '1';
     }, 300);
