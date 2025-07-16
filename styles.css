@@ -104,30 +104,12 @@ body {
     position: relative;
     width: 100%;
     height: 200px;
-    background-color: #2d2d2d;
-    overflow: hidden;
-}
-
-/* 確保圖片載入前容器有合適的大小 */
-.image-container::before {
-    content: '';
-    display: block;
-    padding-top: 75%; /* 保持4:3比例 */
 }
 
 .image-container img {
-    position: absolute;
-    top: 0;
-    left: 0;
     width: 100%;
     height: 100%;
-    object-fit: contain;
-    opacity: 0;
-    transition: opacity 0.3s ease-in-out;
-}
-
-.image-container img[style*="display: block"] {
-    opacity: 1;
+    object-fit: cover;
 }
 
 .save-button {
@@ -141,8 +123,7 @@ body {
     border-radius: 4px;
     cursor: pointer;
     opacity: 0;
-    transition: opacity 0.3s, background-color 0.3s;
-    z-index: 2; /* 確保按鈕在載入指示器上方 */
+    transition: opacity 0.3s;
 }
 
 .image-container:hover .save-button {
@@ -151,16 +132,6 @@ body {
 
 .save-button:hover {
     background-color: #2b4c7e;
-}
-
-.save-button:disabled {
-    background-color: #4a5568;
-    cursor: not-allowed;
-    opacity: 1 !important; /* 確保禁用狀態下仍然可見 */
-}
-
-.save-button[disabled]:hover {
-    background-color: #4a5568;
 }
 
 .delete-button {
@@ -215,18 +186,6 @@ body {
 }
 
 /* 添加設定區域的樣式 */
-.settings {
-    position: fixed;
-    top: 10px;
-    right: 5px;
-    background-color: #2d2d2d;
-    padding: 10px;
-    border-radius: 5px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-    z-index: 1000;
-    transition: all 0.3s ease;
-    min-width: 120px;
-}
 
 .settings label {
     display: flex;
@@ -255,6 +214,15 @@ body {
 /* 設定區域的新樣式 */
 .settings {
     min-width: 150px;
+    position: fixed;
+    top: 10px;
+    right: 5px;
+    background-color: #2d2d2d;
+    padding: 10px;
+    border-radius: 5px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    z-index: 1000;
+    transition: all 0.3s ease;
 }
 
 .view-controls {
@@ -492,129 +460,5 @@ body {
 .page-button:disabled {
     background-color: #4a5568;
     cursor: not-allowed;
-}
-
-/* 改進圖片載入指示器樣式 */
-.loading-indicator {
-    position: relative;
-    width: 100%;
-    height: 60px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background-color: #2d2d2d;
-    color: #e0e0e0;
-    font-size: 14px;
-    margin: 20px 0;
-    border-radius: 5px;
-    padding: 10px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-}
-
-/* 圖片容器內的載入指示器保持絕對定位 */
-.image-container .loading-indicator {
-    position: absolute;
-    top: 0;
-    left: 0;
-    height: 100%;
-    margin: 0;
-    border-radius: 0;
-    box-shadow: none;
-    padding: 0;
-}
-
-/* 添加載入動畫樣式 */
-.loading-spinner {
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    border: 3px solid rgba(255, 255, 255, 0.2);
-    border-top-color: #e0e0e0;
-    animation: spin 1s infinite linear;
-    margin-right: 12px;
-}
-
-.loading-indicator span {
-    font-size: 15px;
-    letter-spacing: 0.5px;
-}
-
-/* 錯誤圖標樣式 */
-.error-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    background-color: #e53e3e;
-    color: white;
-    border-radius: 50%;
-    margin-right: 10px;
-    font-weight: bold;
-}
-
-@keyframes pulse {
-    0% { background-color: #2d2d2d; }
-    50% { background-color: #3d3d3d; }
-    100% { background-color: #2d2d2d; }
-}
-
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-
-.loading-indicator.error {
-    color: #e53e3e;
-    background-color: rgba(45, 45, 45, 0.9);
-    animation: none;
-}
-
-/* 添加搜尋結果區域過渡動畫 */
-#searchResults {
-    transition: all 0.3s ease-in-out;
-}
-
-/* 添加搜尋結果錯誤訊息樣式 */
-.error-message {
-    padding: 20px;
-    background-color: #2d2d2d;
-    color: #e53e3e;
-    border: 1px solid #e53e3e;
-    border-radius: 5px;
-    text-align: center;
-    margin: 10px 0;
-    font-size: 16px;
-}
-
-.error-message::before {
-    content: '!';
-    display: inline-block;
-    width: 24px;
-    height: 24px;
-    line-height: 24px;
-    text-align: center;
-    background-color: #e53e3e;
-    color: white;
-    border-radius: 50%;
-    margin-right: 10px;
-    font-weight: bold;
-}
-
-/* 添加圖片載入失敗樣式 */
-.image-container.load-failed {
-    background-color: #2d2d2d;
-    border: 1px dashed #e53e3e;
-}
-
-/* 添加搜尋結果計數樣式 */
-.result-count {
-    font-size: 14px;
-    color: #a0aec0;
-    margin-bottom: 15px;
-    padding: 5px 10px;
-    background-color: #2d2d2d;
-    border-radius: 4px;
-    display: inline-block;
 }
   
