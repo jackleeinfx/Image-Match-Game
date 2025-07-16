@@ -32,7 +32,10 @@ try {
     });
     
     // 在頁面載入完成後立即載入單詞卡
-    window.addEventListener('load', loadFlashcards);
+    window.addEventListener('load', () => {
+        console.log('頁面載入完成，開始載入單詞卡...');
+        loadFlashcards();
+    });
 } catch (error) {
     console.error('Firebase 初始化失敗:', error);
 }
@@ -451,12 +454,41 @@ async function loadFlashcards() {
         // 載入完成後套用保存的排序狀態
         setTimeout(() => {
             const savedSortMode = localStorage.getItem('sortMode');
+            console.log('載入保存的排序模式:', savedSortMode);
+            
+            // 確保所有卡片都有正確的時間戳
+            const flashcardsContainer = document.getElementById('flashcards');
+            const flashcards = Array.from(flashcardsContainer.children);
+            
+            flashcards.forEach(card => {
+                if (!card.dataset.timestamp && card.dataset.fileName) {
+                    const match = card.dataset.fileName.match(/_(\d+)\.jpg$/);
+                    if (match) {
+                        card.dataset.timestamp = match[1];
+                        console.log('為卡片添加時間戳:', card.dataset.fileName, '-> ', match[1]);
+                    }
+                }
+            });
+            
+            // 應用排序
             if (savedSortMode === 'timeDesc') {
                 sortFlashcardsByTime(false);
+                // 更新按鈕狀態
+                const btn = document.getElementById('sortByTimeDesc');
+                if (btn) btn.classList.add('active');
             } else if (savedSortMode === 'timeAsc') {
                 sortFlashcardsByTime(true);
+                // 更新按鈕狀態
+                const btn = document.getElementById('sortByTimeAsc');
+                if (btn) btn.classList.add('active');
+            } else {
+                // 如果沒有保存的排序模式，默認使用最新優先
+                sortFlashcardsByTime(false);
+                const btn = document.getElementById('sortByTimeDesc');
+                if (btn) btn.classList.add('active');
+                localStorage.setItem('sortMode', 'timeDesc');
             }
-        }, 100);
+        }, 200);
     } catch (error) {
         console.error('載入單詞卡時發生錯誤：', error);
         alert('載入單詞卡失敗：' + error.message);
@@ -628,42 +660,54 @@ document.addEventListener('DOMContentLoaded', () => {
     const sortByTimeDescBtn = document.getElementById('sortByTimeDesc');
     const sortByTimeAscBtn = document.getElementById('sortByTimeAsc');
     
+    // 清除所有排序按鈕的active狀態
+    function clearSortButtonStates() {
+        document.querySelectorAll('.sort-controls button').forEach(btn => {
+            btn.classList.remove('active');
+        });
+    }
+    
     if (sortByTimeDescBtn) {
         sortByTimeDescBtn.addEventListener('click', () => {
+            console.log('點擊最新優先按鈕');
             sortFlashcardsByTime(false); // 最新優先
             
             // 更新按鈕狀態
-            document.querySelectorAll('.sort-controls button').forEach(btn => {
-                btn.classList.remove('active');
-            });
+            clearSortButtonStates();
             sortByTimeDescBtn.classList.add('active');
             
             // 保存排序狀態
             localStorage.setItem('sortMode', 'timeDesc');
+            console.log('已保存排序狀態: timeDesc');
         });
     }
     
     if (sortByTimeAscBtn) {
         sortByTimeAscBtn.addEventListener('click', () => {
+            console.log('點擊最舊優先按鈕');
             sortFlashcardsByTime(true); // 最舊優先
             
             // 更新按鈕狀態
-            document.querySelectorAll('.sort-controls button').forEach(btn => {
-                btn.classList.remove('active');
-            });
+            clearSortButtonStates();
             sortByTimeAscBtn.classList.add('active');
             
             // 保存排序狀態
             localStorage.setItem('sortMode', 'timeAsc');
+            console.log('已保存排序狀態: timeAsc');
         });
     }
     
-    // 載入保存的排序狀態
+    // 載入保存的排序狀態（初始化時）
     const savedSortMode = localStorage.getItem('sortMode');
-    if (savedSortMode === 'timeDesc') {
+    console.log('初始載入的排序狀態:', savedSortMode);
+    
+    if (savedSortMode === 'timeDesc' && sortByTimeDescBtn) {
         sortByTimeDescBtn.classList.add('active');
-    } else if (savedSortMode === 'timeAsc') {
+    } else if (savedSortMode === 'timeAsc' && sortByTimeAscBtn) {
         sortByTimeAscBtn.classList.add('active');
+    } else if (sortByTimeDescBtn) {
+        // 如果沒有保存的狀態，默認設置為最新優先
+        sortByTimeDescBtn.classList.add('active');
     }
 
     // 添加設定面板折疊功能
@@ -776,13 +820,28 @@ function shuffleFlashcards() {
     const flashcardsContainer = document.getElementById('flashcards');
     const flashcards = Array.from(flashcardsContainer.children);
     
+    if (flashcards.length === 0) {
+        console.log('沒有卡片可以隨機排序');
+        return;
+    }
+    
+    console.log('開始隨機排序，卡片數量:', flashcards.length);
+    
     flashcardsContainer.style.opacity = '0';
     
     setTimeout(() => {
+        // 使用 Fisher-Yates 洗牌算法
         for (let i = flashcards.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
-            flashcardsContainer.appendChild(flashcards[j]);
+            // 交換元素
+            const temp = flashcards[i];
+            flashcards[i] = flashcards[j];
+            flashcards[j] = temp;
         }
+        
+        // 清空容器並重新添加洗牌後的卡片
+        flashcardsContainer.innerHTML = '';
+        flashcards.forEach(card => flashcardsContainer.appendChild(card));
         
         flashcardsContainer.style.opacity = '1';
         
@@ -790,6 +849,10 @@ function shuffleFlashcards() {
         document.querySelectorAll('.sort-controls button').forEach(btn => {
             btn.classList.remove('active');
         });
+        
+        // 清除排序狀態
+        localStorage.removeItem('sortMode');
+        console.log('隨機排序完成，已清除排序狀態');
     }, 300);
 }
 
@@ -798,17 +861,40 @@ function sortFlashcardsByTime(ascending = false) {
     const flashcardsContainer = document.getElementById('flashcards');
     const flashcards = Array.from(flashcardsContainer.children);
     
+    if (flashcards.length === 0) {
+        console.log('沒有卡片可排序');
+        return;
+    }
+    
     // 過濾掉錯誤卡片，只排序正常的卡片
     const normalCards = flashcards.filter(card => !card.classList.contains('error'));
     const errorCards = flashcards.filter(card => card.classList.contains('error'));
+    
+    console.log('排序模式:', ascending ? '最舊優先' : '最新優先');
+    console.log('正常卡片數量:', normalCards.length);
     
     flashcardsContainer.style.opacity = '0';
     
     setTimeout(() => {
         // 按時間戳排序
         normalCards.sort((a, b) => {
-            const timestampA = parseInt(a.dataset.timestamp) || 0;
-            const timestampB = parseInt(b.dataset.timestamp) || 0;
+            let timestampA = parseInt(a.dataset.timestamp) || 0;
+            let timestampB = parseInt(b.dataset.timestamp) || 0;
+            
+            // 如果時間戳為0，嘗試從文件名中提取
+            if (timestampA === 0 && a.dataset.fileName) {
+                const match = a.dataset.fileName.match(/_(\d+)\.jpg$/);
+                timestampA = match ? parseInt(match[1]) : Date.now();
+                a.dataset.timestamp = timestampA;
+            }
+            
+            if (timestampB === 0 && b.dataset.fileName) {
+                const match = b.dataset.fileName.match(/_(\d+)\.jpg$/);
+                timestampB = match ? parseInt(match[1]) : Date.now();
+                b.dataset.timestamp = timestampB;
+            }
+            
+            console.log('比較時間戳:', timestampA, 'vs', timestampB);
             
             return ascending ? timestampA - timestampB : timestampB - timestampA;
         });
@@ -821,6 +907,8 @@ function sortFlashcardsByTime(ascending = false) {
         errorCards.forEach(card => flashcardsContainer.appendChild(card));
         
         flashcardsContainer.style.opacity = '1';
+        
+        console.log('排序完成，排序後的時間戳順序:', normalCards.map(card => card.dataset.timestamp));
     }, 300);
 }
 
@@ -842,4 +930,84 @@ function showTemporaryMessage(message, type = 'success') {
         messageDiv.classList.add('fade-out');
         setTimeout(() => messageDiv.remove(), 500);
     }, 2000);
-} 
+}
+
+// 添加診斷函數
+function diagnoseSortingIssues() {
+    console.log('=== 排序功能診斷 ===');
+    
+    const flashcardsContainer = document.getElementById('flashcards');
+    const flashcards = Array.from(flashcardsContainer.children);
+    
+    console.log('卡片總數:', flashcards.length);
+    
+    flashcards.forEach((card, index) => {
+        console.log(`卡片 ${index + 1}:`, {
+            timestamp: card.dataset.timestamp,
+            fileName: card.dataset.fileName,
+            word: card.querySelector('.word-div')?.textContent
+        });
+    });
+    
+    const savedSortMode = localStorage.getItem('sortMode');
+    console.log('保存的排序模式:', savedSortMode);
+    
+    const activeButtons = document.querySelectorAll('.sort-controls button.active');
+    console.log('激活的排序按鈕:', activeButtons.length);
+    
+    activeButtons.forEach(btn => {
+        console.log('激活按鈕:', btn.textContent, btn.id);
+    });
+    
+    console.log('=== 診斷完成 ===');
+}
+
+// 添加全局診斷和修復函數
+window.fixSortingIssues = function() {
+    console.log('手動修復排序問題...');
+    
+    const flashcardsContainer = document.getElementById('flashcards');
+    const flashcards = Array.from(flashcardsContainer.children);
+    
+    // 確保每個卡片都有正確的時間戳
+    flashcards.forEach(card => {
+        if (!card.dataset.timestamp && card.dataset.fileName) {
+            const match = card.dataset.fileName.match(/_(\d+)\.jpg$/);
+            if (match) {
+                card.dataset.timestamp = match[1];
+                console.log('修復卡片時間戳:', card.dataset.fileName, '-> ', match[1]);
+            }
+        }
+    });
+    
+    // 重新載入排序狀態
+    const savedSortMode = localStorage.getItem('sortMode');
+    if (savedSortMode === 'timeDesc') {
+        sortFlashcardsByTime(false);
+    } else if (savedSortMode === 'timeAsc') {
+        sortFlashcardsByTime(true);
+    } else {
+        // 默認設置為最新優先
+        sortFlashcardsByTime(false);
+        localStorage.setItem('sortMode', 'timeDesc');
+    }
+    
+    console.log('排序問題修復完成');
+    showTemporaryMessage('排序功能已重新載入！', 'success');
+};
+
+// 在開發環境中添加診斷快捷鍵
+if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'F12' && e.ctrlKey) {
+            diagnoseSortingIssues();
+        }
+    });
+}
+
+// 在所有環境中添加修復快捷鍵
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'F9' && e.ctrlKey) {
+        window.fixSortingIssues();
+    }
+}); 
