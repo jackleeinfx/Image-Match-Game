@@ -399,7 +399,13 @@ function displaySearchResults(images, searchTerm) {
     });
 }
 
-// 修改 loadFlashcards 函數，使用 Supabase Storage
+// 無限滾動相關變數
+let allFlashcards = []; // 儲存所有單詞卡數據
+let currentLoadedCount = 0; // 目前已載入的數量
+const CARDS_PER_LOAD = 20; // 每次載入的卡片數量
+let isLoading = false; // 防止重複載入
+
+// 修改 loadFlashcards 函數，實現無限滾動
 async function loadFlashcards() {
     try {
         console.log('開始載入單詞卡...');
@@ -436,88 +442,316 @@ async function loadFlashcards() {
             return;
         }
 
-        // 使用 Promise.all 並行處理圖片載入
-        const loadPromises = files.map(async (file) => {
+        // 預處理所有圖片數據，但不載入圖片
+        allFlashcards = files.map(file => {
             const fileName = file.name;
             const word = fileName.split('_')[0];
-            
-            // 從文件名中提取時間戳
             const timestampMatch = fileName.match(/_(\d+)\.jpg$/);
             const timestamp = timestampMatch ? parseInt(timestampMatch[1]) : Date.now();
             
-            try {
-                // 獲取公開 URL
-                const { data: urlData } = supabaseClient.storage
-                    .from('images')
-                    .getPublicUrl(fileName);
-                
-                const imageUrl = urlData.publicUrl;
-                
-                // 預載入圖片
-                await preloadImage(imageUrl);
-                return { imageUrl, word, fileName, timestamp };
-            } catch (error) {
-                console.error('載入圖片失敗:', fileName, error);
-                return { error: true, word, fileName, timestamp };
-            }
+            return {
+                fileName,
+                word,
+                timestamp,
+                loaded: false
+            };
         });
-
-        // 等待所有圖片載入完成
-        const results = await Promise.all(loadPromises);
         
-        // 創建單詞卡
-        results.forEach(result => {
-            if (result.error) {
-                const errorCard = document.createElement('div');
-                errorCard.className = 'flashcard error';
-                errorCard.innerHTML = `<p>載入失敗: ${result.word}</p>`;
-                flashcardsDiv.appendChild(errorCard);
-            } else {
-                createFlashcard(result.imageUrl, result.word, result.fileName, result.timestamp);
-            }
-        });
+        // 重置載入狀態
+        currentLoadedCount = 0;
+        
+        // 載入第一批卡片
+        await loadMoreFlashcards();
+        
+        // 設置無限滾動監聽器
+        setupInfiniteScroll();
         
         // 載入完成後套用保存的排序狀態
         setTimeout(() => {
-            const savedSortMode = localStorage.getItem('sortMode');
-            console.log('載入保存的排序模式:', savedSortMode);
-            
-            // 確保所有卡片都有正確的時間戳
-            const flashcardsContainer = document.getElementById('flashcards');
-            const flashcards = Array.from(flashcardsContainer.children);
-            
-            flashcards.forEach(card => {
-                if (!card.dataset.timestamp && card.dataset.fileName) {
-                    const match = card.dataset.fileName.match(/_(\d+)\.jpg$/);
-                    if (match) {
-                        card.dataset.timestamp = match[1];
-                        console.log('為卡片添加時間戳:', card.dataset.fileName, '-> ', match[1]);
-                    }
-                }
-            });
-            
-            // 應用排序
-            if (savedSortMode === 'timeDesc') {
-                sortFlashcardsByTime(false);
-                // 更新按鈕狀態
-                const btn = document.getElementById('sortByTimeDesc');
-                if (btn) btn.classList.add('active');
-            } else if (savedSortMode === 'timeAsc') {
-                sortFlashcardsByTime(true);
-                // 更新按鈕狀態
-                const btn = document.getElementById('sortByTimeAsc');
-                if (btn) btn.classList.add('active');
-            } else {
-                // 如果沒有保存的排序模式，默認使用最新優先
-                sortFlashcardsByTime(false);
-                const btn = document.getElementById('sortByTimeDesc');
-                if (btn) btn.classList.add('active');
-                localStorage.setItem('sortMode', 'timeDesc');
-            }
+            applySavedSortMode();
         }, 200);
+        
     } catch (error) {
         console.error('載入單詞卡時發生錯誤：', error);
         alert('載入單詞卡失敗：' + error.message);
+    }
+}
+
+// 載入更多單詞卡（只創建卡片結構，不載入圖片）
+async function loadMoreFlashcards() {
+    if (isLoading || currentLoadedCount >= allFlashcards.length) {
+        return;
+    }
+    
+    isLoading = true;
+    console.log(`創建更多卡片: ${currentLoadedCount} - ${currentLoadedCount + CARDS_PER_LOAD}`);
+    
+    // 顯示載入指示器
+    showLoadingIndicator();
+    
+    const flashcardsDiv = document.getElementById('flashcards');
+    const cardsToLoad = allFlashcards.slice(currentLoadedCount, currentLoadedCount + CARDS_PER_LOAD);
+    
+    // 快速創建卡片結構（不載入圖片）
+    cardsToLoad.forEach(cardData => {
+        try {
+            // 獲取公開 URL（不下載圖片）
+            const { data: urlData } = supabaseClient.storage
+                .from('images')
+                .getPublicUrl(cardData.fileName);
+            
+            const imageUrl = urlData.publicUrl;
+            
+            // 創建懶加載的單詞卡
+            createLazyFlashcard(imageUrl, cardData.word, cardData.fileName, cardData.timestamp);
+            
+        } catch (error) {
+            console.error('創建卡片失敗:', cardData.fileName, error);
+            const errorCard = document.createElement('div');
+            errorCard.className = 'flashcard error';
+            errorCard.innerHTML = `<p>載入失敗: ${cardData.word}</p>`;
+            flashcardsDiv.appendChild(errorCard);
+        }
+    });
+    
+    currentLoadedCount += cardsToLoad.length;
+    hideLoadingIndicator();
+    isLoading = false;
+    
+    console.log(`已創建 ${currentLoadedCount}/${allFlashcards.length} 張卡片結構`);
+    
+    // 設置懶加載觀察器（延遲執行確保DOM已更新）
+    setTimeout(() => {
+        setupLazyLoading();
+    }, 100);
+}
+
+// 設置無限滾動監聽器
+function setupInfiniteScroll() {
+    // 移除舊的監聽器（如果有）
+    window.removeEventListener('scroll', handleScroll);
+    
+    // 添加新的監聽器
+    window.addEventListener('scroll', handleScroll);
+}
+
+// 處理滾動事件
+function handleScroll() {
+    // 檢查是否滾動到接近底部
+    const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+    const windowHeight = window.innerHeight;
+    const documentHeight = document.documentElement.scrollHeight;
+    
+    // 當滾動到距離底部 500px 時開始載入更多
+    const threshold = 500;
+    
+    if (scrollTop + windowHeight >= documentHeight - threshold) {
+        loadMoreFlashcards();
+    }
+}
+
+// 顯示載入指示器
+function showLoadingIndicator() {
+    let indicator = document.getElementById('loadingIndicator');
+    if (!indicator) {
+        indicator = document.createElement('div');
+        indicator.id = 'loadingIndicator';
+        indicator.className = 'loading-indicator-infinite';
+        indicator.innerHTML = `
+            <div class="spinner"></div>
+            <p>載入更多單詞卡中...</p>
+        `;
+        document.getElementById('flashcards').appendChild(indicator);
+    }
+    indicator.style.display = 'block';
+}
+
+// 隱藏載入指示器
+function hideLoadingIndicator() {
+    const indicator = document.getElementById('loadingIndicator');
+    if (indicator) {
+        indicator.style.display = 'none';
+    }
+}
+
+// 設置懶加載觀察器
+let imageObserver = null;
+
+function setupLazyLoading() {
+    console.log('設置懶加載觀察器...');
+    
+    // 如果瀏覽器不支援 Intersection Observer，回退到立即載入
+    if (!('IntersectionObserver' in window)) {
+        console.log('瀏覽器不支援 Intersection Observer，使用立即載入');
+        const lazyCards = document.querySelectorAll('.lazy-card[data-loaded="false"]');
+        console.log('找到', lazyCards.length, '個需要立即載入的卡片');
+        lazyCards.forEach(loadImageForCard);
+        return;
+    }
+    
+    // 重新創建觀察器（確保是最新的）
+    if (imageObserver) {
+        imageObserver.disconnect();
+    }
+    
+    imageObserver = new IntersectionObserver((entries) => {
+        console.log('觀察器觸發，檢查', entries.length, '個元素');
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const card = entry.target;
+                console.log('卡片進入視窗:', card.querySelector('.word-div')?.textContent);
+                if (card.dataset.loaded === 'false') {
+                    loadImageForCard(card);
+                    imageObserver.unobserve(card); // 載入後停止觀察
+                }
+            }
+        });
+    }, {
+        rootMargin: '200px', // 增加到200px，更早開始載入
+        threshold: 0.1 // 當10%可見時就觸發
+    });
+    
+    // 觀察所有未載入的懶加載卡片
+    const lazyCards = document.querySelectorAll('.lazy-card[data-loaded="false"]');
+    console.log('找到', lazyCards.length, '個懶加載卡片');
+    lazyCards.forEach((card, index) => {
+        console.log(`觀察卡片 ${index + 1}:`, card.querySelector('.word-div')?.textContent);
+        imageObserver.observe(card);
+    });
+    
+    // 立即載入視窗內的卡片
+    setTimeout(() => {
+        const visibleCards = Array.from(lazyCards).filter(card => {
+            const rect = card.getBoundingClientRect();
+            return rect.top < window.innerHeight && rect.bottom > 0;
+        });
+        console.log('立即載入', visibleCards.length, '個可見卡片');
+        visibleCards.forEach(card => {
+            if (card.dataset.loaded === 'false') {
+                loadImageForCard(card);
+                imageObserver.unobserve(card);
+            }
+        });
+    }, 200);
+}
+
+// 為卡片載入圖片
+async function loadImageForCard(card) {
+    const imageUrl = card.dataset.imageUrl;
+    const word = card.querySelector('.word-div').textContent;
+    
+    // 防止重複載入
+    if (card.dataset.loaded !== 'false') {
+        console.log('卡片已載入或正在載入:', word);
+        return;
+    }
+    
+    // 標記為載入中
+    card.dataset.loaded = 'loading';
+    
+    try {
+        console.log('開始載入圖片:', word, 'URL:', imageUrl);
+        
+        // 創建新的圖片元素
+        const img = document.createElement('img');
+        img.alt = word;
+        img.loading = 'eager'; // 改為立即載入
+        img.style.width = '100%';
+        img.style.height = 'auto';
+        img.style.display = 'block';
+        
+        // 設置載入超時（10秒）
+        const loadPromise = new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+                reject(new Error('載入超時'));
+            }, 10000);
+            
+            img.onload = () => {
+                clearTimeout(timeout);
+                console.log('圖片載入成功:', word);
+                resolve();
+            };
+            
+            img.onerror = (e) => {
+                clearTimeout(timeout);
+                console.error('圖片載入錯誤:', word, e);
+                reject(new Error('圖片載入失敗'));
+            };
+            
+            // 開始載入圖片
+            img.src = imageUrl;
+        });
+        
+        // 等待圖片載入完成
+        await loadPromise;
+        
+        // 替換佔位符
+        const placeholder = card.querySelector('.image-placeholder');
+        if (placeholder) {
+            card.replaceChild(img, placeholder);
+            console.log('佔位符已替換為圖片:', word);
+        } else {
+            console.warn('找不到佔位符:', word);
+        }
+        
+        // 標記為已載入
+        card.dataset.loaded = 'true';
+        card.classList.remove('lazy-card');
+        
+        console.log('✅ 圖片載入完成:', word);
+        
+    } catch (error) {
+        console.error('❌ 圖片載入失敗:', word, 'Error:', error.message, 'URL:', imageUrl);
+        
+        // 顯示錯誤佔位符
+        const placeholder = card.querySelector('.image-placeholder');
+        if (placeholder) {
+            placeholder.innerHTML = `
+                <div class="placeholder-icon">❌</div>
+                <div class="placeholder-text">載入失敗<br>${error.message}</div>
+            `;
+            placeholder.style.color = '#ff6b6b';
+        }
+        
+        card.dataset.loaded = 'error';
+        card.classList.remove('lazy-card');
+    }
+}
+
+// 應用保存的排序模式
+function applySavedSortMode() {
+    const savedSortMode = localStorage.getItem('sortMode');
+    console.log('載入保存的排序模式:', savedSortMode);
+    
+    // 確保所有卡片都有正確的時間戳
+    const flashcardsContainer = document.getElementById('flashcards');
+    const flashcards = Array.from(flashcardsContainer.children);
+    
+    flashcards.forEach(card => {
+        if (!card.dataset.timestamp && card.dataset.fileName) {
+            const match = card.dataset.fileName.match(/_(\d+)\.jpg$/);
+            if (match) {
+                card.dataset.timestamp = match[1];
+                console.log('為卡片添加時間戳:', card.dataset.fileName, '-> ', match[1]);
+            }
+        }
+    });
+    
+    // 應用排序
+    if (savedSortMode === 'timeDesc') {
+        sortFlashcardsByTime(false);
+        const btn = document.getElementById('sortByTimeDesc');
+        if (btn) btn.classList.add('active');
+    } else if (savedSortMode === 'timeAsc') {
+        sortFlashcardsByTime(true);
+        const btn = document.getElementById('sortByTimeAsc');
+        if (btn) btn.classList.add('active');
+    } else {
+        // 如果沒有保存的排序模式，默認使用最新優先
+        sortFlashcardsByTime(false);
+        const btn = document.getElementById('sortByTimeDesc');
+        if (btn) btn.classList.add('active');
+        localStorage.setItem('sortMode', 'timeDesc');
     }
 }
 
@@ -548,19 +782,24 @@ function speakWord(word) {
     }
 }
 
-// 修改 createFlashcard 函數，添加漸進式載入效果
-function createFlashcard(imageUrl, word, fileName, timestamp = Date.now()) {
+// 創建懶加載的單詞卡（只顯示佔位符，圖片稍後載入）
+function createLazyFlashcard(imageUrl, word, fileName, timestamp = Date.now()) {
     const flashcardsDiv = document.getElementById('flashcards');
     
     const card = document.createElement('div');
-    card.className = 'flashcard';
-    card.dataset.timestamp = timestamp; // 添加時間戳數據屬性
-    card.dataset.fileName = fileName; // 添加文件名數據屬性
+    card.className = 'flashcard lazy-card';
+    card.dataset.timestamp = timestamp;
+    card.dataset.fileName = fileName;
+    card.dataset.imageUrl = imageUrl; // 儲存圖片URL，稍後載入
+    card.dataset.loaded = 'false';
     
-    const img = document.createElement('img');
-    img.src = imageUrl;
-    img.alt = word;
-    img.loading = 'lazy'; // 使用延遲載入
+    // 創建佔位符
+    const placeholder = document.createElement('div');
+    placeholder.className = 'image-placeholder';
+    placeholder.innerHTML = `
+        <div class="placeholder-icon">🖼️</div>
+        <div class="placeholder-text">載入中...</div>
+    `;
     
     const wordDiv = document.createElement('div');
     wordDiv.className = 'word-div';
@@ -572,7 +811,61 @@ function createFlashcard(imageUrl, word, fileName, timestamp = Date.now()) {
     deleteButton.onclick = async (e) => {
         e.stopPropagation();
         try {
-            // 使用 Supabase Storage 刪除檔案
+            const { error } = await supabaseClient.storage
+                .from('images')
+                .remove([fileName]);
+            
+            if (error) {
+                throw error;
+            }
+            
+            card.remove();
+            showTemporaryMessage('卡片已刪除！');
+        } catch (error) {
+            console.error('刪除失敗：', error);
+            showTemporaryMessage('刪除失敗：' + error.message, 'error');
+        }
+    };
+    
+    card.addEventListener('dblclick', () => {
+        card.classList.toggle('show-all');
+        speakWord(word);
+        setTimeout(() => {
+            card.classList.remove('show-all');
+        }, 3000);
+    });
+    
+    card.appendChild(placeholder);
+    card.appendChild(wordDiv);
+    card.appendChild(deleteButton);
+    
+    flashcardsDiv.appendChild(card);
+}
+
+// 修改 createFlashcard 函數，添加漸進式載入效果（用於直接載入的圖片）
+function createFlashcard(imageUrl, word, fileName, timestamp = Date.now()) {
+    const flashcardsDiv = document.getElementById('flashcards');
+    
+    const card = document.createElement('div');
+    card.className = 'flashcard';
+    card.dataset.timestamp = timestamp;
+    card.dataset.fileName = fileName;
+    
+    const img = document.createElement('img');
+    img.src = imageUrl;
+    img.alt = word;
+    img.loading = 'lazy';
+    
+    const wordDiv = document.createElement('div');
+    wordDiv.className = 'word-div';
+    wordDiv.textContent = word;
+    
+    const deleteButton = document.createElement('button');
+    deleteButton.textContent = '×';
+    deleteButton.className = 'delete-button';
+    deleteButton.onclick = async (e) => {
+        e.stopPropagation();
+        try {
             const { error } = await supabaseClient.storage
                 .from('images')
                 .remove([fileName]);
