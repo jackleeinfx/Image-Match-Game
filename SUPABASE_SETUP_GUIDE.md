@@ -32,7 +32,37 @@
    - **Public bucket**: ✅ 勾選（這樣圖片可以公開訪問）
 4. 點擊 "Create bucket"
 
-### 5. 更新代碼配置
+### 5. 創建解釋數據表
+1. 在左側導航欄點擊 "SQL Editor"
+2. 點擊 "New query"
+3. 複製並貼上以下 SQL 代碼：
+
+```sql
+CREATE TABLE flashcard_explanations (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    file_name TEXT NOT NULL UNIQUE,
+    word TEXT NOT NULL,
+    chinese_name TEXT DEFAULT '',
+    explanation TEXT DEFAULT '',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 創建索引以提高查詢性能
+CREATE INDEX idx_flashcard_explanations_file_name ON flashcard_explanations(file_name);
+CREATE INDEX idx_flashcard_explanations_word ON flashcard_explanations(word);
+
+-- 啟用行級安全 (RLS)
+ALTER TABLE flashcard_explanations ENABLE ROW LEVEL SECURITY;
+
+-- 創建允許所有操作的策略（對於簡單應用）
+CREATE POLICY "Allow all operations" ON flashcard_explanations FOR ALL USING (true);
+```
+
+4. 點擊 "Run" 執行 SQL
+5. 如果成功，您會看到 "Success. No rows returned" 的訊息
+
+### 6. 更新代碼配置
 在 `main.js` 文件中找到以下兩行：
 
 ```javascript
@@ -53,6 +83,53 @@ const SUPABASE_ANON_KEY = 'eyJ...您的完整anon key...';
 3. 打開開發者工具（F12）查看控制台
 4. 如果看到 "Supabase 初始化成功" 和 "Supabase Storage 連接正常"，表示設置成功！
 
+## ✨ 新功能：完整卡片編輯
+現在每個圖卡都支持完整的編輯功能，您可以：
+
+### 📝 編輯所有字段
+- **單詞名稱**：點擊單詞區域編輯
+- **中文名稱**：點擊中文名區域編輯（金色字體）
+- **解釋內容**：點擊解釋區域編輯
+
+### 👁️ 字段顯示控制
+在控制面板中可以選擇隱藏特定字段：
+- **隱藏中文名**：勾選後中文名字段完全不顯示，不佔用空間
+- **隱藏解釋**：勾選後解釋字段完全不顯示，不佔用空間
+- **設置保存**：隱藏設置會自動保存，重新打開頁面時保持設定
+- **即時生效**：勾選或取消勾選立即生效，無需重新載入
+
+### 🎯 編輯操作
+
+#### 🔄 編輯模式切換
+在控制面板中有一個**編輯模式按鈕**：
+- **✏️ 編輯模式**：橙色按鈕，點擊進入編輯狀態
+- **🔒 鎖定模式**：綠色按鈕，點擊鎖定編輯功能
+- 狀態會**自動保存**，重新打開頁面時保持設定
+
+#### 📝 編輯現有卡片（編輯模式下）
+1. **切換到編輯模式**（點擊編輯模式按鈕）
+2. **點擊任意字段**直接進入編輯狀態
+3. **輸入新內容**（支持多行文本）
+4. **按 Enter 鍵**或**點擊其他地方**保存
+5. **按 ESC 鍵**取消編輯
+6. 每個字段**獨立保存**，即時同步
+
+#### 👁️ 鎖定模式（美觀顯示）
+- **無邊框背景**：字段沒有黑框和深色背景
+- **隱藏空提示**：空字段不顯示"點擊添加..."提示
+- **不可編輯**：點擊字段不會進入編輯狀態
+- **純淨顯示**：專注於內容，界面更美觀
+
+#### 🆕 添加新卡片（弹窗模式）
+1. 搜索並保存圖片後**自動彈出編輯弹窗**
+2. **一次性編輯所有内容**（單詞、中文名、解釋）
+3. **點擊確定**保存所有更改
+4. **點擊取消**放棄更改
+5. 支持**快捷鍵**：Ctrl+Enter 快速確定，ESC 取消
+
+### 🌐 雲端同步
+所有內容會**自動同步到雲端**，在不同設備上都能看到最新數據
+
 ## 🔧 故障排除
 
 ### 問題 1: "請先設置 Supabase 配置！"
@@ -68,6 +145,12 @@ const SUPABASE_ANON_KEY = 'eyJ...您的完整anon key...';
 **解決方法**: 
 1. 回到 Supabase 控制台
 2. 手動創建 `images` bucket 並設置為 public
+
+### 問題 4: "解釋功能無法使用"
+**解決方法**: 
+1. 確認您已在 Supabase SQL Editor 中執行了創建表的 SQL 代碼
+2. 檢查瀏覽器控制台是否有錯誤訊息
+3. 確認數據表 `flashcard_explanations` 已成功創建
 
 ## 💰 費用說明
 - **免費額度**: 每月 500MB 儲存空間，1GB 傳輸量
