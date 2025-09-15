@@ -1,3 +1,53 @@
+// 全域懸停視窗清理函數
+function clearAllGroupTooltips() {
+    const allTooltips = document.querySelectorAll('.group-tooltip');
+    allTooltips.forEach(tooltip => {
+        if (tooltip && tooltip.parentNode) {
+            tooltip.parentNode.removeChild(tooltip);
+        }
+    });
+    
+    // 清理所有群組按鈕的tooltip引用
+    const groupButtons = document.querySelectorAll('.group-button');
+    groupButtons.forEach(button => {
+        if (button.dataset.tooltipId) {
+            delete button.dataset.tooltipId;
+        }
+        if (button.tooltipElement) {
+            button.tooltipElement = null;
+        }
+    });
+}
+
+// 在頁面點擊時清理所有懸停視窗
+document.addEventListener('click', function(e) {
+    // 如果點擊的不是群組按鈕或懸停視窗，則清理所有懸停視窗
+    if (!e.target.closest('.group-button') && !e.target.closest('.group-tooltip')) {
+        clearAllGroupTooltips();
+    }
+});
+
+// 在頁面滾動時也清理懸停視窗
+document.addEventListener('scroll', function() {
+    clearAllGroupTooltips();
+});
+
+// 定期清理機制，每5秒檢查一次是否有殘留的懸停視窗
+setInterval(function() {
+    const tooltips = document.querySelectorAll('.group-tooltip');
+    if (tooltips.length > 0) {
+        console.log('發現殘留的懸停視窗，正在清理...', tooltips.length);
+        clearAllGroupTooltips();
+    }
+}, 5000);
+
+// 頁面可見性變化時清理懸停視窗（例如切換瀏覽器標籤頁）
+document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'visible') {
+        clearAllGroupTooltips();
+    }
+});
+
 // Supabase 配置檢查
 if (!window.supabase) {
     console.error('Supabase SDK 未載入');
@@ -2565,6 +2615,9 @@ class GroupManager {
                 
                 // 滑鼠懸浮事件
                 groupButton.addEventListener('mouseenter', function(e) {
+                    // 先清除任何現有的懸浮視窗
+                    this.clearTooltip();
+                    
                     // 創建懸浮視窗
                     const tooltip = document.createElement('div');
                     tooltip.className = 'group-tooltip';
@@ -2581,20 +2634,61 @@ class GroupManager {
                     
                     // 添加到頁面
                     document.body.appendChild(tooltip);
-                    this.dataset.tooltipId = 'tooltip-' + Date.now();
+                    this.dataset.tooltipId = 'tooltip-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
                     tooltip.id = this.dataset.tooltipId;
+                    
+                    // 儲存tooltip引用以便清理
+                    this.tooltipElement = tooltip;
                 });
                 
                 groupButton.addEventListener('mouseleave', function() {
-                    // 移除懸浮視窗
+                    // 使用延遲清理，確保在GitHub Pages環境中正常工作
+                    setTimeout(() => {
+                        this.clearTooltip();
+                    }, 50);
+                });
+                
+                // 添加額外的清理機制：當滑鼠離開父容器時也清理
+                groupButton.addEventListener('mouseleave', function(e) {
+                    // 檢查滑鼠是否真的離開了按鈕區域
+                    const rect = this.getBoundingClientRect();
+                    const mouseX = e.clientX;
+                    const mouseY = e.clientY;
+                    
+                    if (mouseX < rect.left || mouseX > rect.right || 
+                        mouseY < rect.top || mouseY > rect.bottom) {
+                        // 滑鼠確實離開了按鈕，清理tooltip
+                        setTimeout(() => {
+                            clearAllGroupTooltips();
+                        }, 100);
+                    }
+                });
+                
+                // 添加清理方法
+                groupButton.clearTooltip = function() {
+                    // 方法1: 通過ID清理
                     if (this.dataset.tooltipId) {
                         const tooltip = document.getElementById(this.dataset.tooltipId);
-                        if (tooltip) {
-                            tooltip.remove();
+                        if (tooltip && tooltip.parentNode) {
+                            tooltip.parentNode.removeChild(tooltip);
                         }
                         delete this.dataset.tooltipId;
                     }
-                });
+                    
+                    // 方法2: 通過引用清理
+                    if (this.tooltipElement && this.tooltipElement.parentNode) {
+                        this.tooltipElement.parentNode.removeChild(this.tooltipElement);
+                        this.tooltipElement = null;
+                    }
+                    
+                    // 方法3: 清理所有可能的懸浮視窗
+                    const allTooltips = document.querySelectorAll('.group-tooltip');
+                    allTooltips.forEach(tooltip => {
+                        if (tooltip.parentNode) {
+                            tooltip.parentNode.removeChild(tooltip);
+                        }
+                    });
+                };
             }
 
             // 添加編輯圖標
@@ -2606,7 +2700,17 @@ class GroupManager {
             // 群組按鈕點擊事件（切換可見性）
             groupButton.addEventListener('click', (e) => {
                 if (!e.target.classList.contains('edit-icon')) {
-                    this.toggleGroupVisibility(group.id);
+                    // 立即清理所有懸停視窗
+                    clearAllGroupTooltips();
+                    
+                    // 阻止事件冒泡，避免干擾其他事件處理
+                    e.stopPropagation();
+                    e.preventDefault();
+                    
+                    // 使用短暫延遲確保DOM更新完成，並在GitHub Pages環境中正常工作
+                    setTimeout(() => {
+                        this.toggleGroupVisibility(group.id);
+                    }, 100);
                 }
             });
 
