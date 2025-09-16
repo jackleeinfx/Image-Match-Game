@@ -670,6 +670,31 @@ let currentLoadedCount = 0; // 目前已載入的數量
 const CARDS_PER_LOAD = 20; // 每次載入的卡片數量
 let isLoading = false; // 防止重複載入
 
+// 等待 GroupManager 初始化完成的函數
+async function waitForGroupManager() {
+    return new Promise((resolve) => {
+        if (window.groupManager && window.groupManager.initialized) {
+            resolve();
+            return;
+        }
+        
+        // 監聽 GroupManager 初始化完成事件
+        const handleGroupManagerReady = () => {
+            window.removeEventListener('groupManagerReady', handleGroupManagerReady);
+            resolve();
+        };
+        
+        window.addEventListener('groupManagerReady', handleGroupManagerReady);
+        
+        // 設置超時，防止無限等待
+        setTimeout(() => {
+            window.removeEventListener('groupManagerReady', handleGroupManagerReady);
+            console.warn('GroupManager 初始化超時，繼續載入卡片');
+            resolve();
+        }, 5000);
+    });
+}
+
 // 修改 loadFlashcards 函數，實現無限滾動
 async function loadFlashcards() {
     try {
@@ -681,6 +706,10 @@ async function loadFlashcards() {
         if (!supabaseClient) {
             throw new Error('Supabase 客戶端未初始化');
         }
+        
+        // 等待 GroupManager 初始化完成
+        await waitForGroupManager();
+        console.log('GroupManager 已初始化，開始載入卡片數據');
         
         // 從 Supabase Storage 獲取圖片列表
         const { data: files, error } = await supabaseClient.storage
@@ -736,19 +765,9 @@ async function loadFlashcards() {
             applySavedSortMode();
             // 檢查所有翻譯按鈕的顯示狀態
             checkAllExplanationTranslateButtons();
-            // 更新群組指示器，使用全局變量並檢查初始化狀態
-            if (window.groupManager && window.groupManager.initialized) {
-                window.groupManager.updateCardGroupIndicators();
-                window.groupManager.filterCardsByGroups();
-            } else {
-                // 如果GroupManager還沒初始化，延遲執行
-                setTimeout(() => {
-                    if (window.groupManager && window.groupManager.initialized) {
-                        window.groupManager.updateCardGroupIndicators();
-                        window.groupManager.filterCardsByGroups();
-                    }
-                }, 1000);
-            }
+            // 更新群組指示器和過濾（GroupManager 已確保初始化）
+            window.groupManager.updateCardGroupIndicators();
+            window.groupManager.filterCardsByGroups();
         }, 200);
         
     } catch (error) {
@@ -803,6 +822,13 @@ async function loadMoreFlashcards() {
     // 設置懶加載觀察器（延遲執行確保DOM已更新）
     setTimeout(() => {
         setupLazyLoading();
+        
+        // 應用群組過濾到新載入的卡片
+        if (window.groupManager && window.groupManager.initialized) {
+            window.groupManager.updateCardGroupIndicators();
+            window.groupManager.filterCardsByGroups();
+            console.log('已對新載入的卡片應用群組過濾');
+        }
     }, 100);
 }
 
@@ -1225,16 +1251,10 @@ function createLazyFlashcard(imageUrl, word, fileName, timestamp = Date.now(), a
         }
     }
     
-    // 異步添加群組指示器，確保GroupManager已初始化
-    const addGroupIndicator = () => {
-        if (window.groupManager && window.groupManager.initialized) {
-            window.groupManager.updateSingleCardGroupIndicator(card, fileName);
-        } else {
-            // 如果GroupManager還沒初始化，等待更長時間後重試
-            setTimeout(addGroupIndicator, 500);
-        }
-    };
-    setTimeout(addGroupIndicator, 100);
+    // 添加群組指示器（GroupManager 已確保初始化）
+    if (window.groupManager && window.groupManager.initialized) {
+        window.groupManager.updateSingleCardGroupIndicator(card, fileName);
+    }
 }
 
 // 修改 createFlashcard 函數，添加漸進式載入效果（用於直接載入的圖片）
@@ -1411,16 +1431,10 @@ function createFlashcard(imageUrl, word, fileName, timestamp = Date.now()) {
         flashcardsDiv.appendChild(card);
     }
     
-    // 異步添加群組指示器，確保GroupManager已初始化
-    const addGroupIndicator = () => {
-        if (window.groupManager && window.groupManager.initialized) {
-            window.groupManager.updateSingleCardGroupIndicator(card, fileName);
-        } else {
-            // 如果GroupManager還沒初始化，等待更長時間後重試
-            setTimeout(addGroupIndicator, 500);
-        }
-    };
-    setTimeout(addGroupIndicator, 100);
+    // 添加群組指示器（GroupManager 已確保初始化）
+    if (window.groupManager && window.groupManager.initialized) {
+        window.groupManager.updateSingleCardGroupIndicator(card, fileName);
+    }
 }
 
 // 在初始化部分添加拖放事件監聽
