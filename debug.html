@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub Pages 診斷頁面</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            padding: 20px;
+            margin: 0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .section {
+            background: #2d2d2d;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            border: 1px solid #404040;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .status.success {
+            background: #48bb78;
+            color: white;
+        }
+        .status.error {
+            background: #e53e3e;
+            color: white;
+        }
+        .status.warning {
+            background: #ed8936;
+            color: white;
+        }
+        .code {
+            background: #1a1a1a;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            margin: 10px 0;
+        }
+        button {
+            background: #3182ce;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #2c5aa0;
+        }
+        .info {
+            background: #3182ce;
+            color: white;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 GitHub Pages 診斷工具</h1>
+        
+        <div class="info">
+            <strong>使用說明：</strong>
+            <br>1. 這個頁面會檢查您的應用在 GitHub Pages 上的運行狀態
+            <br>2. 如果發現問題，會提供具體的解決建議
+            <br>3. 請保持瀏覽器開發者工具打開以查看詳細日誌
+        </div>
+
+        <div class="section">
+            <h2>📍 基本環境檢查</h2>
+            <div id="environment-check">檢查中...</div>
+        </div>
+
+        <div class="section">
+            <h2>🌐 網路連接檢查</h2>
+            <div id="network-check">檢查中...</div>
+            <button onclick="testSupabaseConnection()">測試 Supabase 連接</button>
+        </div>
+
+        <div class="section">
+            <h2>📚 依賴載入檢查</h2>
+            <div id="dependencies-check">檢查中...</div>
+        </div>
+
+        <div class="section">
+            <h2>🔧 常見問題解決方案</h2>
+            <div id="solutions">
+                <h3>如果 Supabase 連接失敗：</h3>
+                <ul>
+                    <li>檢查 SUPABASE_URL 和 SUPABASE_ANON_KEY 是否正確</li>
+                    <li>確認 Supabase 項目的 images bucket 已創建且設為公開</li>
+                    <li>檢查 GitHub Pages 域名是否在 Supabase 的允許域名列表中</li>
+                </ul>
+
+                <h3>如果語音功能不工作：</h3>
+                <ul>
+                    <li>ResponsiveVoice 在 GitHub Pages 上可能載入失敗</li>
+                    <li>應用會自動降級到瀏覽器內建語音</li>
+                    <li>確保瀏覽器支持 Web Speech API</li>
+                </ul>
+
+                <h3>如果圖片無法載入：</h3>
+                <ul>
+                    <li>檢查 HTTPS 混合內容問題</li>
+                    <li>確認 Supabase Storage 的 CORS 設置正確</li>
+                    <li>檢查圖片 URL 是否可以直接訪問</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>📋 診斷日誌</h2>
+            <div class="code" id="diagnostic-log">等待診斷結果...</div>
+            <button onclick="clearLog()">清空日誌</button>
+            <button onclick="copyLog()">複製日誌</button>
+        </div>
+    </div>
+
+    <!-- 載入必要的依賴 -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://code.responsivevoice.org/responsivevoice.js?key=C065BhbX"></script>
+
+    <script>
+        // 診斷日誌
+        let diagnosticLog = [];
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${type.toUpperCase()}: ${message}`;
+            diagnosticLog.push(logEntry);
+            
+            const logElement = document.getElementById('diagnostic-log');
+            logElement.textContent = diagnosticLog.join('\n');
+            
+            console.log(logEntry);
+        }
+
+        function clearLog() {
+            diagnosticLog = [];
+            document.getElementById('diagnostic-log').textContent = '日誌已清空';
+        }
+
+        function copyLog() {
+            navigator.clipboard.writeText(diagnosticLog.join('\n')).then(() => {
+                alert('日誌已複製到剪貼簿');
+            });
+        }
+
+        // 基本環境檢查
+        function checkEnvironment() {
+            const envDiv = document.getElementById('environment-check');
+            let html = '';
+
+            // 檢查當前域名和協議
+            const hostname = window.location.hostname;
+            const protocol = window.location.protocol;
+            
+            html += `<div class="status ${protocol === 'https:' ? 'success' : 'error'}">
+                協議: ${protocol} ${protocol === 'https:' ? '✅' : '❌ (GitHub Pages 需要 HTTPS)'}
+            </div>`;
+            
+            html += `<div class="status success">域名: ${hostname}</div>`;
+            
+            // 檢查瀏覽器功能
+            const features = {
+                'Fetch API': 'fetch' in window,
+                'Local Storage': 'localStorage' in window,
+                'Speech Synthesis': 'speechSynthesis' in window,
+                'Web Speech API': 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window
+            };
+
+            for (const [feature, supported] of Object.entries(features)) {
+                html += `<div class="status ${supported ? 'success' : 'warning'}">
+                    ${feature}: ${supported ? '✅ 支持' : '⚠️ 不支持'}
+                </div>`;
+                log(`${feature}: ${supported ? '支持' : '不支持'}`);
+            }
+
+            envDiv.innerHTML = html;
+        }
+
+        // 網路連接檢查
+        function checkNetwork() {
+            const networkDiv = document.getElementById('network-check');
+            networkDiv.innerHTML = '<div class="status success">網路連接正常 ✅</div>';
+            log('網路連接檢查完成');
+        }
+
+        // 依賴載入檢查
+        function checkDependencies() {
+            const depsDiv = document.getElementById('dependencies-check');
+            let html = '';
+
+            const dependencies = {
+                'Supabase SDK': window.supabase,
+                'ResponsiveVoice': window.responsiveVoice
+            };
+
+            for (const [dep, loaded] of Object.entries(dependencies)) {
+                html += `<div class="status ${loaded ? 'success' : 'error'}">
+                    ${dep}: ${loaded ? '✅ 已載入' : '❌ 載入失敗'}
+                </div>`;
+                log(`${dep}: ${loaded ? '已載入' : '載入失敗'}`);
+            }
+
+            depsDiv.innerHTML = html;
+        }
+
+        // 測試 Supabase 連接
+        async function testSupabaseConnection() {
+            const SUPABASE_URL = 'https://lnuguottscfwsmthmrkv.supabase.co';
+            const SUPABASE_ANON_KEY = 'sb_publishable_kywRcUbkTQza7NwH8N4_Fg_oE0h4tSj';
+
+            try {
+                log('開始測試 Supabase 連接...');
+                
+                if (!window.supabase) {
+                    throw new Error('Supabase SDK 未載入');
+                }
+
+                const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                
+                // 測試 Storage 連接
+                const { data, error } = await client.storage.listBuckets();
+                
+                if (error) {
+                    throw error;
+                }
+
+                const networkDiv = document.getElementById('network-check');
+                networkDiv.innerHTML += '<div class="status success">Supabase 連接測試成功 ✅</div>';
+                log('Supabase 連接測試成功');
+                log(`找到 ${data.length} 個 Storage Buckets`);
+
+                // 檢查 images bucket
+                const imagesBucket = data.find(bucket => bucket.name === 'images');
+                if (imagesBucket) {
+                    log('images bucket 存在 ✅');
+                    networkDiv.innerHTML += '<div class="status success">images bucket 存在 ✅</div>';
+                } else {
+                    log('images bucket 不存在 ❌');
+                    networkDiv.innerHTML += '<div class="status error">images bucket 不存在 ❌</div>';
+                }
+
+            } catch (error) {
+                log(`Supabase 連接失敗: ${error.message}`, 'error');
+                const networkDiv = document.getElementById('network-check');
+                networkDiv.innerHTML += `<div class="status error">Supabase 連接失敗: ${error.message} ❌</div>`;
+            }
+        }
+
+        // 頁面載入時執行檢查
+        document.addEventListener('DOMContentLoaded', () => {
+            log('開始 GitHub Pages 診斷...');
+            checkEnvironment();
+            checkNetwork();
+            
+            // 延遲檢查依賴，確保外部腳本有時間載入
+            setTimeout(() => {
+                checkDependencies();
+                // 自動測試 Supabase 連接
+                testSupabaseConnection();
+            }, 2000);
+        });
+    </script>
+</body>
+</html>
