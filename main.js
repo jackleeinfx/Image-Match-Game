@@ -53,6 +53,21 @@ console.log('🚀 開始載入應用...');
 console.log('📍 當前域名:', window.location.hostname);
 console.log('🔒 當前協議:', window.location.protocol);
 
+// 移動設備檢測和調試
+const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+const isChrome = /Chrome/.test(navigator.userAgent);
+console.log('📱 設備信息:', {
+    isMobile,
+    isIOS,
+    isChrome,
+    userAgent: navigator.userAgent,
+    viewport: {
+        width: window.innerWidth,
+        height: window.innerHeight
+    }
+});
+
 // Supabase 配置
 const SUPABASE_URL = 'https://lnuguottscfwsmthmrkv.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_kywRcUbkTQza7NwH8N4_Fg_oE0h4tSj';
@@ -138,6 +153,48 @@ function showUserFriendlyError(error) {
     }, 10000);
 }
 
+// 移動設備專用的 DOM 檢查
+function checkMobileDOMElements() {
+    const elements = {
+        groupsSection: document.querySelector('.groups-section'),
+        groupsList: document.getElementById('groupsList'),
+        addGroupBtn: document.getElementById('addGroupBtn'),
+        noGroupBtn: document.getElementById('noGroupBtn')
+    };
+    
+    console.log('📱 移動設備 DOM 檢查:', elements);
+    
+    // 如果群組區域不存在，強制創建
+    if (!elements.groupsSection) {
+        console.warn('⚠️ groups-section 不存在，正在創建...');
+        const groupsSection = document.createElement('div');
+        groupsSection.className = 'groups-section';
+        groupsSection.innerHTML = `
+            <div id="groupsList" class="groups-list">
+                <button id="addGroupBtn" class="add-group-button">+ 新增群組</button>
+                <button id="noGroupBtn" class="no-group-button" title="無群組圖卡"></button>
+            </div>
+        `;
+        
+        const dropZone = document.getElementById('dropZone');
+        if (dropZone) {
+            dropZone.parentNode.insertBefore(groupsSection, dropZone.nextSibling);
+        } else {
+            document.querySelector('.container').appendChild(groupsSection);
+        }
+    }
+    
+    // 強制顯示群組區域
+    const groupsSection = document.querySelector('.groups-section');
+    if (groupsSection) {
+        groupsSection.style.display = 'block';
+        groupsSection.style.visibility = 'visible';
+        groupsSection.style.opacity = '1';
+    }
+    
+    return elements;
+}
+
 // 增強的應用初始化
 async function initializeApp() {
     try {
@@ -147,6 +204,15 @@ async function initializeApp() {
         console.log('🔄 初始化資料表...');
         await initializeDatabase();
         
+        // 移動設備專用檢查
+        if (isMobile) {
+            console.log('📱 執行移動設備專用初始化...');
+            checkMobileDOMElements();
+            
+            // 添加移動設備專用的觸控事件
+            document.addEventListener('touchstart', function() {}, { passive: true });
+        }
+        
         console.log('🔄 等待群組管理器...');
         await waitForGroupManager();
         
@@ -155,8 +221,44 @@ async function initializeApp() {
         
         console.log('🎉 應用初始化完成！');
         
+        // 移動設備後續檢查
+        if (isMobile) {
+            setTimeout(() => {
+                checkMobileGroupsVisibility();
+            }, 2000);
+        }
+        
     } catch (error) {
         console.error('💥 應用初始化失敗:', error);
+    }
+}
+
+// 移動設備群組可見性檢查
+function checkMobileGroupsVisibility() {
+    const groupsSection = document.querySelector('.groups-section');
+    const groupsList = document.getElementById('groupsList');
+    const addGroupBtn = document.getElementById('addGroupBtn');
+    const noGroupBtn = document.getElementById('noGroupBtn');
+    
+    console.log('📱 移動設備群組可見性檢查:', {
+        groupsSection: !!groupsSection,
+        groupsList: !!groupsList,
+        addGroupBtn: !!addGroupBtn,
+        noGroupBtn: !!noGroupBtn,
+        groupsSectionVisible: groupsSection ? window.getComputedStyle(groupsSection).display !== 'none' : false,
+        groupsListVisible: groupsList ? window.getComputedStyle(groupsList).display !== 'none' : false
+    });
+    
+    // 如果群組按鈕不可見，強制顯示
+    if (groupsSection && window.getComputedStyle(groupsSection).display === 'none') {
+        console.log('🔧 強制顯示群組區域');
+        groupsSection.style.display = 'block !important';
+        groupsSection.style.visibility = 'visible !important';
+    }
+    
+    if (groupsList && window.getComputedStyle(groupsList).display === 'none') {
+        console.log('🔧 強制顯示群組列表');
+        groupsList.style.display = 'flex !important';
     }
 }
 
@@ -2691,12 +2793,24 @@ class GroupManager {
         }
     }
 
-    // 渲染群組按鈕
+    // 渲染群組按鈕（移動設備增強版）
     renderGroups() {
-        const groupsList = document.getElementById('groupsList');
+        let groupsList = document.getElementById('groupsList');
         if (!groupsList) {
             console.error('groupsList element not found');
-            return;
+            
+            // 移動設備上如果找不到，嘗試重新創建
+            if (isMobile) {
+                console.log('📱 移動設備上重新創建 groupsList');
+                checkMobileDOMElements();
+                groupsList = document.getElementById('groupsList');
+                if (!groupsList) {
+                    console.error('❌ 無法創建 groupsList');
+                    return;
+                }
+            } else {
+                return;
+            }
         }
         
         // 保留新增群組按鈕和無群組按鈕，只移除其他群組按鈕
