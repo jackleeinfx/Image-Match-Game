@@ -48,10 +48,10 @@ document.addEventListener('visibilitychange', function() {
     }
 });
 
-// Supabase 配置檢查
-if (!window.supabase) {
-    console.error('Supabase SDK 未載入');
-}
+// GitHub Pages 增強配置
+console.log('🚀 開始載入應用...');
+console.log('📍 當前域名:', window.location.hostname);
+console.log('🔒 當前協議:', window.location.protocol);
 
 // Supabase 配置
 const SUPABASE_URL = 'https://lnuguottscfwsmthmrkv.supabase.co';
@@ -60,30 +60,111 @@ const SUPABASE_ANON_KEY = 'sb_publishable_kywRcUbkTQza7NwH8N4_Fg_oE0h4tSj';
 // 初始化 Supabase 客戶端
 let supabaseClient;
 
-try {
-    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    console.log('Supabase 初始化成功');
-    
-    // 測試 Supabase 連接
-    supabaseClient.storage.listBuckets().then(({ data, error }) => {
-        if (error) {
-            console.error('Supabase Storage 連接失敗:', error);
-        } else {
-            console.log('Supabase Storage 連接正常');
+// 增強的初始化函數
+async function initializeSupabaseWithRetry(maxRetries = 3) {
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            // 檢查 Supabase SDK
+            if (!window.supabase) {
+                throw new Error('Supabase SDK 未載入，請檢查網路連接');
+            }
+            
+            const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            
+            // 測試連接
+            const { data, error } = await client.storage.listBuckets();
+            if (error) {
+                throw error;
+            }
+            
+            console.log('✅ Supabase 連接成功');
+            return client;
+            
+        } catch (error) {
+            console.error(`❌ Supabase 初始化失敗 (嘗試 ${i + 1}/${maxRetries}):`, error);
+            
+            if (i === maxRetries - 1) {
+                // 顯示用戶友好的錯誤
+                showUserFriendlyError(error);
+                throw error;
+            }
+            
+            // 等待後重試
+            await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
         }
-    });
+    }
+}
+
+// 用戶友好的錯誤顯示
+function showUserFriendlyError(error) {
+    const errorContainer = document.createElement('div');
+    errorContainer.style.cssText = `
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #ef4444;
+        color: white;
+        padding: 15px 20px;
+        border-radius: 8px;
+        z-index: 10000;
+        max-width: 500px;
+        text-align: center;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    `;
     
-    // 初始化数据表
-    initializeDatabase();
+    let message = '應用載入失敗';
+    if (error.message.includes('bucket')) {
+        message = '儲存空間未設置，請先在 Supabase 中創建 images bucket';
+    } else if (error.message.includes('network') || error.message.includes('fetch')) {
+        message = '網路連接問題，請檢查網路或稍後重試';
+    } else if (error.message.includes('unauthorized') || error.message.includes('auth')) {
+        message = 'API 金鑰無效，請檢查 Supabase 配置';
+    }
     
-    // 在頁面載入完成後立即載入單詞卡
-    window.addEventListener('load', () => {
-        console.log('頁面載入完成，開始載入單詞卡...');
-        loadFlashcards();
-    });
-} catch (error) {
-    console.error('Supabase 初始化失敗:', error);
-    alert('請先設置 Supabase 配置！請在 main.js 中填入您的 SUPABASE_URL 和 SUPABASE_ANON_KEY');
+    errorContainer.innerHTML = `
+        <div style="margin-bottom: 10px;">⚠️ ${message}</div>
+        <div style="font-size: 12px; opacity: 0.8;">錯誤詳情: ${error.message}</div>
+        <button onclick="this.parentElement.remove()" style="margin-top: 10px; padding: 5px 10px; background: rgba(255,255,255,0.2); border: none; color: white; border-radius: 4px; cursor: pointer;">關閉</button>
+    `;
+    
+    document.body.appendChild(errorContainer);
+    
+    // 10秒後自動移除
+    setTimeout(() => {
+        if (errorContainer.parentElement) {
+            errorContainer.remove();
+        }
+    }, 10000);
+}
+
+// 增強的應用初始化
+async function initializeApp() {
+    try {
+        console.log('🔄 初始化 Supabase...');
+        supabaseClient = await initializeSupabaseWithRetry();
+        
+        console.log('🔄 初始化資料表...');
+        await initializeDatabase();
+        
+        console.log('🔄 等待群組管理器...');
+        await waitForGroupManager();
+        
+        console.log('🔄 載入單詞卡...');
+        await loadFlashcards();
+        
+        console.log('🎉 應用初始化完成！');
+        
+    } catch (error) {
+        console.error('💥 應用初始化失敗:', error);
+    }
+}
+
+// 使用改進的初始化流程
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeApp);
+} else {
+    initializeApp();
 }
 
 // 初始化数据库表
@@ -670,6 +751,31 @@ let currentLoadedCount = 0; // 目前已載入的數量
 const CARDS_PER_LOAD = 20; // 每次載入的卡片數量
 let isLoading = false; // 防止重複載入
 
+// 等待 GroupManager 初始化完成的函數
+async function waitForGroupManager() {
+    return new Promise((resolve) => {
+        if (window.groupManager && window.groupManager.initialized) {
+            resolve();
+            return;
+        }
+        
+        // 監聽 GroupManager 初始化完成事件
+        const handleGroupManagerReady = () => {
+            window.removeEventListener('groupManagerReady', handleGroupManagerReady);
+            resolve();
+        };
+        
+        window.addEventListener('groupManagerReady', handleGroupManagerReady);
+        
+        // 設置超時，防止無限等待
+        setTimeout(() => {
+            window.removeEventListener('groupManagerReady', handleGroupManagerReady);
+            console.warn('GroupManager 初始化超時，繼續載入卡片');
+            resolve();
+        }, 5000);
+    });
+}
+
 // 修改 loadFlashcards 函數，實現無限滾動
 async function loadFlashcards() {
     try {
@@ -681,6 +787,10 @@ async function loadFlashcards() {
         if (!supabaseClient) {
             throw new Error('Supabase 客戶端未初始化');
         }
+        
+        // 等待 GroupManager 初始化完成
+        await waitForGroupManager();
+        console.log('GroupManager 已初始化，開始載入卡片數據');
         
         // 從 Supabase Storage 獲取圖片列表
         const { data: files, error } = await supabaseClient.storage
@@ -736,19 +846,9 @@ async function loadFlashcards() {
             applySavedSortMode();
             // 檢查所有翻譯按鈕的顯示狀態
             checkAllExplanationTranslateButtons();
-            // 更新群組指示器，使用全局變量並檢查初始化狀態
-            if (window.groupManager && window.groupManager.initialized) {
-                window.groupManager.updateCardGroupIndicators();
-                window.groupManager.filterCardsByGroups();
-            } else {
-                // 如果GroupManager還沒初始化，延遲執行
-                setTimeout(() => {
-                    if (window.groupManager && window.groupManager.initialized) {
-                        window.groupManager.updateCardGroupIndicators();
-                        window.groupManager.filterCardsByGroups();
-                    }
-                }, 1000);
-            }
+            // 更新群組指示器和過濾（GroupManager 已確保初始化）
+            window.groupManager.updateCardGroupIndicators();
+            window.groupManager.filterCardsByGroups();
         }, 200);
         
     } catch (error) {
@@ -803,6 +903,13 @@ async function loadMoreFlashcards() {
     // 設置懶加載觀察器（延遲執行確保DOM已更新）
     setTimeout(() => {
         setupLazyLoading();
+        
+        // 應用群組過濾到新載入的卡片
+        if (window.groupManager && window.groupManager.initialized) {
+            window.groupManager.updateCardGroupIndicators();
+            window.groupManager.filterCardsByGroups();
+            console.log('已對新載入的卡片應用群組過濾');
+        }
     }, 100);
 }
 
@@ -1056,18 +1163,31 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// 修改speakWord函數
+// 修改speakWord函數（增強版，支持降級）
 function speakWord(word) {
     if (word) {
         // 從設定中獲取語速，如果沒有則使用默認值0.8
         const speechRate = parseFloat(localStorage.getItem('speechRate')) || 0.8;
         
-        responsiveVoice.cancel(); // 如果有正在播放的語音，先停止
-        responsiveVoice.speak(word, "US English Male", {
-            rate: speechRate,
-            pitch: 1,
-            volume: 1
-        });
+        if (typeof responsiveVoice !== 'undefined' && responsiveVoice.speak) {
+            responsiveVoice.cancel(); // 如果有正在播放的語音，先停止
+            responsiveVoice.speak(word, "US English Male", {
+                rate: speechRate,
+                pitch: 1,
+                volume: 1
+            });
+        } else if ('speechSynthesis' in window) {
+            // 降級到瀏覽器內建語音
+            speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(word);
+            utterance.rate = speechRate;
+            utterance.pitch = 1;
+            utterance.volume = 1;
+            speechSynthesis.speak(utterance);
+            console.log('🔊 使用瀏覽器內建語音播放:', word);
+        } else {
+            console.warn('⚠️ 語音功能不可用');
+        }
     }
 }
 
@@ -1225,16 +1345,10 @@ function createLazyFlashcard(imageUrl, word, fileName, timestamp = Date.now(), a
         }
     }
     
-    // 異步添加群組指示器，確保GroupManager已初始化
-    const addGroupIndicator = () => {
-        if (window.groupManager && window.groupManager.initialized) {
-            window.groupManager.updateSingleCardGroupIndicator(card, fileName);
-        } else {
-            // 如果GroupManager還沒初始化，等待更長時間後重試
-            setTimeout(addGroupIndicator, 500);
-        }
-    };
-    setTimeout(addGroupIndicator, 100);
+    // 添加群組指示器（GroupManager 已確保初始化）
+    if (window.groupManager && window.groupManager.initialized) {
+        window.groupManager.updateSingleCardGroupIndicator(card, fileName);
+    }
 }
 
 // 修改 createFlashcard 函數，添加漸進式載入效果（用於直接載入的圖片）
@@ -1411,16 +1525,10 @@ function createFlashcard(imageUrl, word, fileName, timestamp = Date.now()) {
         flashcardsDiv.appendChild(card);
     }
     
-    // 異步添加群組指示器，確保GroupManager已初始化
-    const addGroupIndicator = () => {
-        if (window.groupManager && window.groupManager.initialized) {
-            window.groupManager.updateSingleCardGroupIndicator(card, fileName);
-        } else {
-            // 如果GroupManager還沒初始化，等待更長時間後重試
-            setTimeout(addGroupIndicator, 500);
-        }
-    };
-    setTimeout(addGroupIndicator, 100);
+    // 添加群組指示器（GroupManager 已確保初始化）
+    if (window.groupManager && window.groupManager.initialized) {
+        window.groupManager.updateSingleCardGroupIndicator(card, fileName);
+    }
 }
 
 // 在初始化部分添加拖放事件監聽
