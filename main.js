@@ -53,21 +53,6 @@ console.log('🚀 開始載入應用...');
 console.log('📍 當前域名:', window.location.hostname);
 console.log('🔒 當前協議:', window.location.protocol);
 
-// 移動設備檢測和調試
-const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-const isChrome = /Chrome/.test(navigator.userAgent);
-console.log('📱 設備信息:', {
-    isMobile,
-    isIOS,
-    isChrome,
-    userAgent: navigator.userAgent,
-    viewport: {
-        width: window.innerWidth,
-        height: window.innerHeight
-    }
-});
-
 // Supabase 配置
 const SUPABASE_URL = 'https://lnuguottscfwsmthmrkv.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_kywRcUbkTQza7NwH8N4_Fg_oE0h4tSj';
@@ -153,28 +138,6 @@ function showUserFriendlyError(error) {
     }, 10000);
 }
 
-// 移動設備專用的 DOM 檢查（保留供診斷使用）
-function checkMobileDOMElements() {
-    const elements = {
-        groupsSection: document.querySelector('.groups-section'),
-        groupsList: document.getElementById('groupsList'),
-        addGroupBtn: document.getElementById('addGroupBtn'),
-        noGroupBtn: document.getElementById('noGroupBtn')
-    };
-    
-    console.log('📱 移動設備 DOM 檢查:', elements);
-    
-    // 只在移動設備上且元素不存在時才強制創建
-    if (isMobile && !elements.groupsSection) {
-        console.warn('⚠️ 移動設備上 groups-section 不存在，正在創建...');
-        if (window.groupManager && window.groupManager.ensureGroupsSection) {
-            window.groupManager.ensureGroupsSection();
-        }
-    }
-    
-    return elements;
-}
-
 // 增強的應用初始化
 async function initializeApp() {
     try {
@@ -184,17 +147,6 @@ async function initializeApp() {
         console.log('🔄 初始化資料表...');
         await initializeDatabase();
         
-        // 設備專用檢查（所有設備都執行基本檢查）
-        console.log('🔧 執行設備初始化檢查...');
-        
-        if (isMobile) {
-            console.log('📱 移動設備專用初始化...');
-            // 添加移動設備專用的觸控事件
-            document.addEventListener('touchstart', function() {}, { passive: true });
-        } else {
-            console.log('🖥️ 桌面設備初始化...');
-        }
-        
         console.log('🔄 等待群組管理器...');
         await waitForGroupManager();
         
@@ -203,44 +155,8 @@ async function initializeApp() {
         
         console.log('🎉 應用初始化完成！');
         
-        // 移動設備後續檢查
-        if (isMobile) {
-            setTimeout(() => {
-                checkMobileGroupsVisibility();
-            }, 2000);
-        }
-        
     } catch (error) {
         console.error('💥 應用初始化失敗:', error);
-    }
-}
-
-// 移動設備群組可見性檢查
-function checkMobileGroupsVisibility() {
-    const groupsSection = document.querySelector('.groups-section');
-    const groupsList = document.getElementById('groupsList');
-    const addGroupBtn = document.getElementById('addGroupBtn');
-    const noGroupBtn = document.getElementById('noGroupBtn');
-    
-    console.log('📱 移動設備群組可見性檢查:', {
-        groupsSection: !!groupsSection,
-        groupsList: !!groupsList,
-        addGroupBtn: !!addGroupBtn,
-        noGroupBtn: !!noGroupBtn,
-        groupsSectionVisible: groupsSection ? window.getComputedStyle(groupsSection).display !== 'none' : false,
-        groupsListVisible: groupsList ? window.getComputedStyle(groupsList).display !== 'none' : false
-    });
-    
-    // 如果群組按鈕不可見，強制顯示
-    if (groupsSection && window.getComputedStyle(groupsSection).display === 'none') {
-        console.log('🔧 強制顯示群組區域');
-        groupsSection.style.display = 'block !important';
-        groupsSection.style.visibility = 'visible !important';
-    }
-    
-    if (groupsList && window.getComputedStyle(groupsList).display === 'none') {
-        console.log('🔧 強制顯示群組列表');
-        groupsList.style.display = 'flex !important';
     }
 }
 
@@ -2599,9 +2515,6 @@ class GroupManager {
         if (this.initialized) return;
         
         try {
-            // 確保群組區域存在
-            this.ensureGroupsSection();
-            
             this.initializeEventListeners();
             this.loadGroupsFromCloud();
             this.initialized = true;
@@ -2623,35 +2536,26 @@ class GroupManager {
 
     // 初始化事件監聽器
     initializeEventListeners() {
-        // 移除舊的事件監聽器（避免重複綁定）
-        const addGroupBtn = document.getElementById('addGroupBtn');
-        const noGroupBtn = document.getElementById('noGroupBtn');
-        
         // 新增群組按鈕
+        const addGroupBtn = document.getElementById('addGroupBtn');
         if (addGroupBtn) {
-            // 移除舊的監聽器
-            addGroupBtn.removeEventListener('click', this.addGroupClickHandler);
-            this.addGroupClickHandler = () => {
+            console.log('Adding event listener to addGroupBtn');
+            addGroupBtn.addEventListener('click', () => {
                 console.log('Add group button clicked');
                 this.showGroupEditModal();
-            };
-            addGroupBtn.addEventListener('click', this.addGroupClickHandler);
-            console.log('✅ addGroupBtn event listener added');
+            });
         } else {
-            console.error('❌ addGroupBtn element not found');
+            console.error('addGroupBtn element not found');
         }
 
         // 無群組按鈕
+        const noGroupBtn = document.getElementById('noGroupBtn');
         if (noGroupBtn) {
-            // 移除舊的監聽器
-            noGroupBtn.removeEventListener('click', this.noGroupClickHandler);
-            this.noGroupClickHandler = () => {
+            noGroupBtn.addEventListener('click', () => {
                 this.toggleNoGroupVisibility();
-            };
-            noGroupBtn.addEventListener('click', this.noGroupClickHandler);
-            console.log('✅ noGroupBtn event listener added');
+            });
         } else {
-            console.error('❌ noGroupBtn element not found');
+            console.error('noGroupBtn element not found');
         }
 
         // 群組編輯彈窗事件
@@ -2787,60 +2691,12 @@ class GroupManager {
         }
     }
 
-    // 確保群組區域存在（通用方法）
-    ensureGroupsSection() {
-        let groupsSection = document.querySelector('.groups-section');
-        if (!groupsSection) {
-            console.log('🔧 創建 groups-section');
-            groupsSection = document.createElement('div');
-            groupsSection.className = 'groups-section';
-            groupsSection.innerHTML = `
-                <div id="groupsList" class="groups-list">
-                    <button id="addGroupBtn" class="add-group-button">+ 新增群組</button>
-                    <button id="noGroupBtn" class="no-group-button" title="無群組圖卡"></button>
-                </div>
-            `;
-            
-            const dropZone = document.getElementById('dropZone');
-            if (dropZone) {
-                dropZone.parentNode.insertBefore(groupsSection, dropZone.nextSibling);
-            } else {
-                const container = document.querySelector('.container');
-                if (container) {
-                    container.appendChild(groupsSection);
-                }
-            }
-            
-            // 重新初始化事件監聽器
-            this.initializeEventListeners();
-        }
-        
-        // 強制顯示群組區域
-        groupsSection.style.display = 'block';
-        groupsSection.style.visibility = 'visible';
-        groupsSection.style.opacity = '1';
-        
-        const groupsList = document.getElementById('groupsList');
-        if (groupsList) {
-            groupsList.style.display = 'flex';
-            groupsList.style.visibility = 'visible';
-        }
-    }
-
     // 渲染群組按鈕
     renderGroups() {
-        let groupsList = document.getElementById('groupsList');
+        const groupsList = document.getElementById('groupsList');
         if (!groupsList) {
             console.error('groupsList element not found');
-            
-            // 嘗試重新創建（所有設備）
-            console.log('🔧 重新創建 groupsList');
-            this.ensureGroupsSection();
-            groupsList = document.getElementById('groupsList');
-            if (!groupsList) {
-                console.error('❌ 無法創建 groupsList');
-                return;
-            }
+            return;
         }
         
         // 保留新增群組按鈕和無群組按鈕，只移除其他群組按鈕
