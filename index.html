@@ -61,6 +61,7 @@
         
         <div id="dropZone" class="drop-zone">
             <p>將圖片拖放到這裡</p>
+            <button id="pasteImageBtn" class="paste-image-button">📋 貼上剪貼簿圖片</button>
         </div>
         
         <!-- 群組控制區域 -->
@@ -184,6 +185,41 @@
             <div class="modal-footer">
                 <button id="deleteGroupCancelBtn" class="modal-btn cancel-btn">取消</button>
                 <button id="deleteGroupConfirmBtn" class="modal-btn delete-btn">確定刪除</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 剪貼簿貼圖彈窗 -->
+    <div id="pasteImageModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>從剪貼簿添加圖片</h3>
+                <button class="modal-close" id="pasteImageModalCloseBtn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="paste-preview-container">
+                    <img id="pasteImagePreview" src="" alt="剪貼簿圖片預覽" style="display: none;">
+                    <div id="pasteImagePlaceholder" class="paste-placeholder">
+                        <div class="paste-icon">📋</div>
+                        <p>正在讀取剪貼簿圖片...</p>
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label for="pasteWordInput">單詞：</label>
+                    <input type="text" id="pasteWordInput" placeholder="請輸入這張圖片的單詞">
+                </div>
+                <div class="input-group">
+                    <label for="pasteChineseNameInput">中文名：</label>
+                    <input type="text" id="pasteChineseNameInput" placeholder="請輸入中文名稱（可選）">
+                </div>
+                <div class="input-group">
+                    <label for="pasteExplanationInput">解釋內容：</label>
+                    <textarea id="pasteExplanationInput" placeholder="請輸入對這個單詞的解釋...（可選）"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="pasteImageCancelBtn" class="modal-btn cancel-btn">取消</button>
+                <button id="pasteImageConfirmBtn" class="modal-btn confirm-btn">添加圖卡</button>
             </div>
         </div>
     </div>

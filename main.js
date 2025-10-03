@@ -583,6 +583,136 @@ async function saveImageToSupabase(imageUrl, searchTerm) {
     }
 }
 
+// 專門用於剪貼簿貼圖的保存函數，支持直接傳入中文名和解釋
+async function saveImageToSupabaseWithDetails(imageUrl, word, chineseName = '', explanation = '') {
+    try {
+        console.log('開始儲存剪貼簿圖片到 Supabase:', imageUrl);
+        
+        if (!supabaseClient) {
+            throw new Error('Supabase 客戶端未初始化');
+        }
+        
+        const timestamp = Date.now();
+        const fileName = `${word}_${timestamp}.jpg`;
+        
+        // 获取图片数据
+        let blob;
+        try {
+            // 先嘗試直接獲取圖片
+            const response = await fetch(imageUrl, {
+                mode: 'cors',
+                headers: {
+                    'Access-Control-Allow-Origin': '*'
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error('直接獲取圖片失敗');
+            }
+            
+            blob = await response.blob();
+        } catch (error) {
+            console.log('直接獲取失敗，嘗試使用圖片元素獲取:', error);
+            
+            // 如果直接獲取失敗，使用圖片元素獲取
+            blob = await new Promise((resolve, reject) => {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    const ctx = canvas.getContext('2d');
+                    
+                    try {
+                        ctx.drawImage(img, 0, 0);
+                        canvas.toBlob(resolve, 'image/jpeg', 0.95);
+                    } catch (e) {
+                        reject(new Error('圖片處理失敗: ' + e.message));
+                    }
+                };
+                
+                img.onerror = () => {
+                    reject(new Error('圖片載入失敗'));
+                };
+                
+                // 添加時間戳避免快取問題
+                img.src = imageUrl + (imageUrl.includes('?') ? '&' : '?') + 't=' + Date.now();
+            });
+        }
+
+        if (!blob || blob.size === 0) {
+            throw new Error('圖片數據無效');
+        }
+
+        // 壓縮圖片
+        console.log('開始壓縮圖片，原始大小:', blob.size);
+        const compressedBlob = await compressImage(blob);
+        console.log('壓縮完成，壓縮後大小:', compressedBlob.size);
+        
+        // 上传到 Supabase Storage
+        console.log('開始上傳到 Supabase Storage:', fileName);
+        
+        const { data, error } = await supabaseClient.storage
+            .from('images')
+            .upload(fileName, compressedBlob, {
+                contentType: 'image/jpeg',
+                upsert: true
+            });
+        
+        if (error) {
+            console.error('上傳失敗:', error);
+            throw error;
+        }
+        
+        console.log('上傳完成，獲取公開 URL...');
+        
+        // 獲取公開 URL
+        const { data: urlData } = supabaseClient.storage
+            .from('images')
+            .getPublicUrl(fileName);
+        
+        const downloadUrl = urlData.publicUrl;
+        console.log('公開 URL:', downloadUrl);
+        
+        // 验证图片是否可以访问
+        console.log('开始验证图片可访问性:', fileName, downloadUrl);
+        await verifyImageAccessible(downloadUrl);
+        console.log('图片验证完成，准备保存數據');
+        
+        // 直接保存卡片数据到数据库
+        await saveCardDataToSupabase(fileName, word, chineseName, explanation);
+        
+        // 创建卡片并立即显示
+        console.log('开始创建卡片:', fileName, word);
+        createFlashcard(downloadUrl, word, fileName, timestamp);
+        
+        // 立即更新新创建卡片的显示
+        setTimeout(() => {
+            const card = document.querySelector(`[data-file-name="${fileName}"]`);
+            if (card) {
+                const wordDiv = card.querySelector('.word-div');
+                const chineseNameDiv = card.querySelector('.chinese-name-div');
+                const explanationDiv = card.querySelector('.explanation-div');
+                
+                if (wordDiv) wordDiv.textContent = word;
+                if (chineseNameDiv) chineseNameDiv.textContent = chineseName;
+                if (explanationDiv) {
+                    // 将换行符转换为HTML换行标签
+                    explanationDiv.innerHTML = explanation.replace(/\n/g, '<br>');
+                }
+            }
+        }, 100);
+        
+        console.log('剪貼簿圖片儲存成功:', fileName);
+        
+    } catch (error) {
+        console.error('儲存剪貼簿圖片過程中發生錯誤：', error);
+        throw error;
+    }
+}
+
 function displaySearchResults(images, searchTerm) {
     const resultsDiv = document.getElementById('searchResults');
     resultsDiv.innerHTML = '';
@@ -1467,6 +1597,23 @@ document.addEventListener('DOMContentLoaded', () => {
     // 處理拖放
     dropZone.addEventListener('drop', handleDrop, false);
 
+    // 添加剪貼簿貼上功能
+    const pasteImageBtn = document.getElementById('pasteImageBtn');
+    pasteImageBtn.addEventListener('click', handlePasteImage);
+
+    // 添加鍵盤快捷鍵支持 (Ctrl+V)
+    document.addEventListener('keydown', function(e) {
+        if (e.ctrlKey && e.key === 'v') {
+            // 檢查是否在輸入框中，如果是則不處理
+            const activeElement = document.activeElement;
+            if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA')) {
+                return;
+            }
+            e.preventDefault();
+            handlePasteImage();
+        }
+    });
+
     // 添加設定控制
     const hideControlsCheckbox = document.getElementById('hideControls');
     hideControlsCheckbox.addEventListener('change', function() {
@@ -1789,6 +1936,154 @@ async function handleDrop(e) {
         console.error('拖放處理失敗：', error);
         showTemporaryMessage('處理圖片失敗：' + error.message, 'error');
     }
+}
+
+// 處理剪貼簿貼上圖片
+async function handlePasteImage() {
+    try {
+        // 檢查瀏覽器是否支持剪貼簿 API
+        if (!navigator.clipboard || !navigator.clipboard.read) {
+            showTemporaryMessage('您的瀏覽器不支持剪貼簿圖片讀取功能', 'error');
+            return;
+        }
+
+        // 讀取剪貼簿內容
+        const clipboardItems = await navigator.clipboard.read();
+        
+        // 查找圖片項目
+        let imageFound = false;
+        for (const clipboardItem of clipboardItems) {
+            for (const type of clipboardItem.types) {
+                if (type.startsWith('image/')) {
+                    imageFound = true;
+                    const blob = await clipboardItem.getType(type);
+                    
+                    // 顯示模態彈窗
+                    showPasteImageModal(blob);
+                    return;
+                }
+            }
+        }
+        
+        if (!imageFound) {
+            showTemporaryMessage('剪貼簿中沒有找到圖片', 'error');
+        }
+        
+    } catch (error) {
+        console.error('讀取剪貼簿失敗：', error);
+        if (error.name === 'NotAllowedError') {
+            showTemporaryMessage('請允許訪問剪貼簿權限', 'error');
+        } else {
+            showTemporaryMessage('讀取剪貼簿失敗：' + error.message, 'error');
+        }
+    }
+}
+
+// 顯示剪貼簿貼圖模態彈窗
+function showPasteImageModal(blob) {
+    const modal = document.getElementById('pasteImageModal');
+    const preview = document.getElementById('pasteImagePreview');
+    const placeholder = document.getElementById('pasteImagePlaceholder');
+    const wordInput = document.getElementById('pasteWordInput');
+    const chineseNameInput = document.getElementById('pasteChineseNameInput');
+    const explanationInput = document.getElementById('pasteExplanationInput');
+    const confirmBtn = document.getElementById('pasteImageConfirmBtn');
+    
+    // 創建圖片 URL 並顯示預覽
+    const imageUrl = URL.createObjectURL(blob);
+    preview.src = imageUrl;
+    preview.style.display = 'block';
+    placeholder.style.display = 'none';
+    
+    // 清空輸入框
+    wordInput.value = '';
+    chineseNameInput.value = '';
+    explanationInput.value = '';
+    
+    // 禁用確認按鈕直到輸入單詞
+    confirmBtn.disabled = true;
+    
+    // 顯示模態彈窗
+    modal.classList.add('show');
+    
+    // 聚焦到單詞輸入框
+    setTimeout(() => wordInput.focus(), 100);
+    
+    // 單詞輸入框變化時啟用/禁用確認按鈕
+    wordInput.addEventListener('input', function() {
+        confirmBtn.disabled = !this.value.trim();
+    });
+    
+    // 確認按鈕點擊事件
+    confirmBtn.onclick = async function() {
+        const word = wordInput.value.trim();
+        const chineseName = chineseNameInput.value.trim();
+        const explanation = explanationInput.value.trim();
+        
+        if (!word) {
+            showTemporaryMessage('請輸入單詞', 'error');
+            return;
+        }
+        
+        try {
+            // 禁用按鈕防止重複點擊
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = '添加中...';
+            
+            // 保存圖片到 Supabase
+            await saveImageToSupabaseWithDetails(imageUrl, word, chineseName, explanation);
+            
+            // 清理資源
+            URL.revokeObjectURL(imageUrl);
+            
+            // 關閉模態彈窗
+            modal.classList.remove('show');
+            
+            showTemporaryMessage('圖片已成功從剪貼簿添加！');
+            
+        } catch (error) {
+            console.error('處理剪貼簿圖片過程中發生錯誤：', error);
+            showTemporaryMessage('添加失敗：' + error.message, 'error');
+            
+            // 恢復按鈕狀態
+            confirmBtn.disabled = false;
+            confirmBtn.textContent = '添加圖卡';
+        }
+    };
+    
+    // 取消按鈕點擊事件
+    document.getElementById('pasteImageCancelBtn').onclick = function() {
+        URL.revokeObjectURL(imageUrl);
+        modal.classList.remove('show');
+        showTemporaryMessage('已取消添加圖片', 'error');
+    };
+    
+    // 關閉按鈕點擊事件
+    document.getElementById('pasteImageModalCloseBtn').onclick = function() {
+        URL.revokeObjectURL(imageUrl);
+        modal.classList.remove('show');
+        showTemporaryMessage('已取消添加圖片', 'error');
+    };
+    
+    // 點擊背景關閉模態彈窗
+    modal.onclick = function(e) {
+        if (e.target === modal) {
+            URL.revokeObjectURL(imageUrl);
+            modal.classList.remove('show');
+            showTemporaryMessage('已取消添加圖片', 'error');
+        }
+    };
+    
+    // ESC 鍵關閉模態彈窗
+    const handleEsc = function(e) {
+        if (e.key === 'Escape') {
+            URL.revokeObjectURL(imageUrl);
+            modal.classList.remove('show');
+            document.removeEventListener('keydown', handleEsc);
+            showTemporaryMessage('已取消添加圖片', 'error');
+        }
+    };
+    document.addEventListener('keydown', handleEsc);
 }
 
 // 修改 shuffleFlashcards 函數，移除提示訊息
