@@ -1609,6 +1609,18 @@ document.addEventListener('DOMContentLoaded', () => {
             if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA')) {
                 return;
             }
+            
+            // 檢查是否在編輯模式下的可編輯元素中
+            if (activeElement && activeElement.contentEditable === 'true') {
+                return;
+            }
+            
+            // 檢查是否在模態彈窗中
+            const modals = document.querySelectorAll('.modal-overlay.show');
+            if (modals.length > 0) {
+                return;
+            }
+            
             e.preventDefault();
             handlePasteImage();
         }
