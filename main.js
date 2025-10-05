@@ -2021,10 +2021,20 @@ function showPasteImageModal(blob) {
     // 聚焦到單詞輸入框
     setTimeout(() => wordInput.focus(), 100);
     
+    // 清理函數
+    const cleanup = function() {
+        URL.revokeObjectURL(imageUrl);
+        modal.classList.remove('show');
+        document.removeEventListener('keydown', handleEsc);
+        // 移除事件監聽器
+        wordInput.removeEventListener('input', wordInputHandler);
+    };
+    
     // 單詞輸入框變化時啟用/禁用確認按鈕
-    wordInput.addEventListener('input', function() {
+    const wordInputHandler = function() {
         confirmBtn.disabled = !this.value.trim();
-    });
+    };
+    wordInput.addEventListener('input', wordInputHandler);
     
     // 確認按鈕點擊事件
     confirmBtn.onclick = async function() {
@@ -2046,10 +2056,7 @@ function showPasteImageModal(blob) {
             await saveImageToSupabaseWithDetails(imageUrl, word, chineseName, explanation);
             
             // 清理資源
-            URL.revokeObjectURL(imageUrl);
-            
-            // 關閉模態彈窗
-            modal.classList.remove('show');
+            cleanup();
             
             showTemporaryMessage('圖片已成功從剪貼簿添加！');
             
@@ -2065,23 +2072,20 @@ function showPasteImageModal(blob) {
     
     // 取消按鈕點擊事件
     document.getElementById('pasteImageCancelBtn').onclick = function() {
-        URL.revokeObjectURL(imageUrl);
-        modal.classList.remove('show');
+        cleanup();
         showTemporaryMessage('已取消添加圖片', 'error');
     };
     
     // 關閉按鈕點擊事件
     document.getElementById('pasteImageModalCloseBtn').onclick = function() {
-        URL.revokeObjectURL(imageUrl);
-        modal.classList.remove('show');
+        cleanup();
         showTemporaryMessage('已取消添加圖片', 'error');
     };
     
     // 點擊背景關閉模態彈窗
     modal.onclick = function(e) {
         if (e.target === modal) {
-            URL.revokeObjectURL(imageUrl);
-            modal.classList.remove('show');
+            cleanup();
             showTemporaryMessage('已取消添加圖片', 'error');
         }
     };
@@ -2089,9 +2093,7 @@ function showPasteImageModal(blob) {
     // ESC 鍵關閉模態彈窗
     const handleEsc = function(e) {
         if (e.key === 'Escape') {
-            URL.revokeObjectURL(imageUrl);
-            modal.classList.remove('show');
-            document.removeEventListener('keydown', handleEsc);
+            cleanup();
             showTemporaryMessage('已取消添加圖片', 'error');
         }
     };
