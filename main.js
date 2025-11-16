@@ -1597,6 +1597,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // 處理拖放
     dropZone.addEventListener('drop', handleDrop, false);
 
+    // 添加文件選擇功能
+    const fileInput = document.getElementById('fileInput');
+    const selectImageBtn = document.getElementById('selectImageBtn');
+    selectImageBtn.addEventListener('click', () => {
+        fileInput.click();
+    });
+    fileInput.addEventListener('change', handleFileSelect);
+
     // 添加剪貼簿貼上功能
     const pasteImageBtn = document.getElementById('pasteImageBtn');
     pasteImageBtn.addEventListener('click', handlePasteImage);
@@ -1946,6 +1954,51 @@ async function handleDrop(e) {
         }
     } catch (error) {
         console.error('拖放處理失敗：', error);
+        showTemporaryMessage('處理圖片失敗：' + error.message, 'error');
+    }
+}
+
+// 處理文件選擇
+async function handleFileSelect(e) {
+    const files = e.target.files;
+    
+    if (!files || files.length === 0) {
+        return;
+    }
+
+    try {
+        // 處理每個選中的文件
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            
+            // 檢查是否為圖片文件
+            if (!file.type.match('^image/')) {
+                showTemporaryMessage(`文件 "${file.name}" 不是圖片文件，已跳過`, 'error');
+                continue;
+            }
+
+            // 先詢問單詞
+            const word = prompt(`請輸入第 ${i + 1} 張圖片（共 ${files.length} 張）的單詞：`);
+            if (!word) {
+                showTemporaryMessage('已取消添加圖片', 'error');
+                continue;
+            }
+
+            try {
+                const imageUrl = URL.createObjectURL(file);
+                await saveImageToSupabase(imageUrl, word);
+                URL.revokeObjectURL(imageUrl);
+                showTemporaryMessage(`圖片 ${i + 1}/${files.length} 已成功添加！`);
+            } catch (error) {
+                console.error('處理文件過程中發生錯誤：', error);
+                showTemporaryMessage(`添加圖片 ${i + 1} 失敗：` + error.message, 'error');
+            }
+        }
+        
+        // 清空文件選擇器，以便下次可以選擇相同的文件
+        e.target.value = '';
+    } catch (error) {
+        console.error('文件選擇處理失敗：', error);
         showTemporaryMessage('處理圖片失敗：' + error.message, 'error');
     }
 }

@@ -61,7 +61,11 @@
         
         <div id="dropZone" class="drop-zone">
             <p>將圖片拖放到這裡</p>
-            <button id="pasteImageBtn" class="paste-image-button">📋 貼上剪貼簿圖片</button>
+            <div class="upload-buttons">
+                <input type="file" id="fileInput" accept="image/*" style="display: none;" multiple>
+                <button id="selectImageBtn" class="select-image-button">📷 選擇照片</button>
+                <button id="pasteImageBtn" class="paste-image-button">📋 貼上剪貼簿圖片</button>
+            </div>
         </div>
         
         <!-- 群組控制區域 -->

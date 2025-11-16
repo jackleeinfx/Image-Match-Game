@@ -459,8 +459,16 @@ body.edit-mode .flashcard .translate-button {
     font-size: 16px;
 }
 
-.paste-image-button {
+.upload-buttons {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
     margin-top: 15px;
+}
+
+.select-image-button,
+.paste-image-button {
     padding: 10px 20px;
     background-color: #3182ce;
     color: white;
@@ -475,15 +483,18 @@ body.edit-mode .flashcard .translate-button {
     gap: 8px;
 }
 
+.select-image-button:hover,
 .paste-image-button:hover {
     background-color: #2c5aa0;
     transform: translateY(-1px);
 }
 
+.select-image-button:active,
 .paste-image-button:active {
     transform: translateY(0);
 }
 
+.select-image-button:disabled,
 .paste-image-button:disabled {
     background-color: #4a5568;
     cursor: not-allowed;
