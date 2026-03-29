@@ -202,8 +202,11 @@ body.hide-failed-flashcards .flashcard.flashcard-load-failed {
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 3;
+    line-clamp: 3;
     overflow: hidden;
     white-space: normal; /* 使用 <br> 時不需要 pre-wrap */
+    /* Firefox/部分環境 fallback：即使不支援 line-clamp 也限制 3 行 */
+    max-height: calc(1.4em * 3);
 }
 
 .flashcard .explanation-div.explanation-expanded {

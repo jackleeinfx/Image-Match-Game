@@ -1327,10 +1327,11 @@ function createLazyFlashcard(imageUrl, word, fileName, timestamp = Date.now(), a
     };
     
     card.addEventListener('dblclick', (e) => {
-        // 如果点击的是可编辑字段，不触发双击事件
-        if (e.target.classList.contains('word-div') || 
-            e.target.classList.contains('chinese-name-div') || 
-            e.target.classList.contains('explanation-div')) {
+        // 只在编辑模式下屏蔽可编辑字段的双击，避免和编辑冲突
+        if (document.body.classList.contains('edit-mode') &&
+            (e.target.classList.contains('word-div') ||
+            e.target.classList.contains('chinese-name-div') ||
+            e.target.classList.contains('explanation-div'))) {
             return;
         }
         
@@ -1528,10 +1529,11 @@ function createFlashcard(imageUrl, word, fileName, timestamp = Date.now()) {
     };
     
     card.addEventListener('dblclick', (e) => {
-        // 如果点击的是可编辑字段，不触发双击事件
-        if (e.target.classList.contains('word-div') || 
-            e.target.classList.contains('chinese-name-div') || 
-            e.target.classList.contains('explanation-div')) {
+        // 只在编辑模式下屏蔽可编辑字段的双击，避免和编辑冲突
+        if (document.body.classList.contains('edit-mode') &&
+            (e.target.classList.contains('word-div') ||
+            e.target.classList.contains('chinese-name-div') ||
+            e.target.classList.contains('explanation-div'))) {
             return;
         }
         
