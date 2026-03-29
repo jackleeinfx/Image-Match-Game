@@ -120,6 +120,11 @@ body {
     margin-top: 40px;
 }
 
+/* 預設隱藏圖片載入失敗的單詞卡；設定中勾選「顯示…」時會移除 body 上的 class */
+body.hide-failed-flashcards .flashcard.flashcard-load-failed {
+    display: none !important;
+}
+
 #flashcards {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(var(--card-size, 250px), 1fr));
@@ -190,6 +195,26 @@ body {
     text-align: left;
     flex: 1;
     white-space: pre-wrap;
+}
+
+/* 解釋欄位展開/縮回（平常只顯示前 3 行） */
+.flashcard .explanation-div.explanation-collapsed {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    overflow: hidden;
+    white-space: normal; /* 使用 <br> 時不需要 pre-wrap */
+}
+
+.flashcard .explanation-div.explanation-expanded {
+    display: block;
+    -webkit-line-clamp: unset;
+    overflow: visible;
+    white-space: pre-wrap;
+}
+
+body:not(.edit-mode) .flashcard .explanation-div[role="button"] {
+    cursor: pointer;
 }
 
 .flashcard .explanation-div:hover {

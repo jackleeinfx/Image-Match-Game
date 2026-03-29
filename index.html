@@ -25,6 +25,9 @@
                 <label>
                     <input type="checkbox" id="hideExplanation"> 隱藏解釋
                 </label>
+                <label title="預設隱藏圖片無法載入的單詞卡；勾選後可查看以便刪除或修正">
+                    <input type="checkbox" id="showFailedFlashcards"> 顯示圖片載入失敗的單詞卡
+                </label>
                 <div class="size-control">
                     <label for="cardSize">卡片大小：</label>
                     <input type="range" id="cardSize" min="100" max="300" value="250">
@@ -58,6 +61,8 @@
             <button id="searchButton">搜尋圖片</button>
             <button id="nextPage" class="page-button">→</button>
         </div>
+
+        <div id="searchResults" class="image-grid"></div>
         
         <div id="dropZone" class="drop-zone">
             <p>將圖片拖放到這裡</p>
@@ -76,8 +81,6 @@
                 <!-- 其他群組按鍵會動態添加到這裡 -->
             </div>
         </div>
-        
-        <div id="searchResults" class="image-grid"></div>
 
         <div class="flashcards-section">
             <h2>單詞卡</h2>

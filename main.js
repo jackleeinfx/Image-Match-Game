@@ -918,7 +918,7 @@ async function loadMoreFlashcards() {
         } catch (error) {
             console.error('創建卡片失敗:', cardData.fileName, error);
             const errorCard = document.createElement('div');
-            errorCard.className = 'flashcard error';
+            errorCard.className = 'flashcard error flashcard-load-failed';
             errorCard.innerHTML = `<p>載入失敗: ${cardData.word}</p>`;
             flashcardsDiv.appendChild(errorCard);
         }
@@ -1045,93 +1045,97 @@ function setupLazyLoading() {
     }, 200);
 }
 
-// 為卡片載入圖片
+function markFlashcardImageLoadFailed(card) {
+    if (!card || !card.classList.contains('flashcard')) return;
+    card.classList.add('flashcard-load-failed');
+    card.dataset.imageLoadFailed = 'true';
+}
+
+function syncHideFailedFlashcardsClass() {
+    const showFailed = localStorage.getItem('showFailedFlashcards') === 'true';
+    document.body.classList.toggle('hide-failed-flashcards', !showFailed);
+}
+
+// 為卡片載入圖片（含重試；仍失敗則標記為載入失敗並依設定隱藏）
 async function loadImageForCard(card) {
     const imageUrl = card.dataset.imageUrl;
     const word = card.querySelector('.word-div').textContent;
     
-    // 防止重複載入
     if (card.dataset.loaded !== 'false') {
         console.log('卡片已載入或正在載入:', word);
         return;
     }
     
-    // 標記為載入中
     card.dataset.loaded = 'loading';
+    const maxAttempts = 4;
+    let lastError = null;
     
-    try {
-        console.log('開始載入圖片:', word, 'URL:', imageUrl);
+    console.log('開始載入圖片:', word, 'URL:', imageUrl);
+    
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        const sep = imageUrl.includes('?') ? '&' : '?';
+        const tryUrl = imageUrl + sep + 't=' + Date.now() + '&try=' + attempt;
         
-        // 創建新的圖片元素
-        const img = document.createElement('img');
-        img.alt = word;
-        img.loading = 'eager'; // 改為立即載入
-        img.style.width = '100%';
-        img.style.height = 'auto';
-        img.style.display = 'block';
-        img.style.opacity = '0.5'; // 初始半透明
-        
-        // 設置載入超時（10秒）
-        const loadPromise = new Promise((resolve, reject) => {
-            const timeout = setTimeout(() => {
-                reject(new Error('載入超時'));
-            }, 10000);
+        try {
+            const img = await new Promise((resolve, reject) => {
+                const el = document.createElement('img');
+                el.alt = word;
+                el.loading = 'eager';
+                el.style.width = '100%';
+                el.style.height = 'auto';
+                el.style.display = 'block';
+                el.style.opacity = '0.5';
+                const timeout = setTimeout(() => {
+                    el.onload = el.onerror = null;
+                    reject(new Error('載入超時'));
+                }, 10000);
+                el.onload = () => {
+                    clearTimeout(timeout);
+                    el.style.opacity = '1';
+                    resolve(el);
+                };
+                el.onerror = () => {
+                    clearTimeout(timeout);
+                    reject(new Error('圖片載入失敗'));
+                };
+                el.src = tryUrl;
+            });
             
-            img.onload = () => {
-                clearTimeout(timeout);
-                console.log('圖片載入成功:', word);
-                img.style.opacity = '1'; // 加载成功后变为不透明
-                resolve();
-            };
-            
-            img.onerror = (e) => {
-                clearTimeout(timeout);
-                console.error('圖片載入錯誤:', word, e);
-                // 重试加载
-                setTimeout(() => {
-                    img.src = imageUrl + '?retry=' + Date.now();
-                }, 1000);
-                reject(new Error('圖片載入失敗'));
-            };
-            
-            // 開始載入圖片，添加时间戳避免缓存问题
-            img.src = imageUrl + (imageUrl.includes('?') ? '&' : '?') + 't=' + Date.now();
-        });
-        
-        // 等待圖片載入完成
-        await loadPromise;
-        
-        // 替換佔位符
-        const placeholder = card.querySelector('.image-placeholder');
-        if (placeholder) {
-            card.replaceChild(img, placeholder);
-            console.log('佔位符已替換為圖片:', word);
-        } else {
-            console.warn('找不到佔位符:', word);
+            const placeholder = card.querySelector('.image-placeholder');
+            if (placeholder) {
+                card.replaceChild(img, placeholder);
+                console.log('佔位符已替換為圖片:', word);
+            } else {
+                console.warn('找不到佔位符:', word);
+            }
+            card.dataset.loaded = 'true';
+            card.classList.remove('lazy-card');
+            console.log('✅ 圖片載入完成:', word);
+            return;
+        } catch (error) {
+            lastError = error;
+            console.error('圖片載入嘗試失敗:', word, attempt, error.message);
+            if (attempt < maxAttempts - 1) {
+                await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+            }
         }
-        
-        // 標記為已載入
-        card.dataset.loaded = 'true';
-        card.classList.remove('lazy-card');
-        
-        console.log('✅ 圖片載入完成:', word);
-        
-    } catch (error) {
-        console.error('❌ 圖片載入失敗:', word, 'Error:', error.message, 'URL:', imageUrl);
-        
-        // 顯示錯誤佔位符
-        const placeholder = card.querySelector('.image-placeholder');
-        if (placeholder) {
-            placeholder.innerHTML = `
-                <div class="placeholder-icon">❌</div>
-                <div class="placeholder-text">載入失敗<br>${error.message}</div>
-            `;
-            placeholder.style.color = '#ff6b6b';
-        }
-        
-        card.dataset.loaded = 'error';
-        card.classList.remove('lazy-card');
     }
+    
+    const errMsg = lastError ? lastError.message : '未知錯誤';
+    console.error('❌ 圖片載入失敗:', word, errMsg, 'URL:', imageUrl);
+    
+    const placeholder = card.querySelector('.image-placeholder');
+    if (placeholder) {
+        placeholder.innerHTML = `
+            <div class="placeholder-icon">❌</div>
+            <div class="placeholder-text">載入失敗<br>${errMsg}</div>
+        `;
+        placeholder.style.color = '#ff6b6b';
+    }
+    
+    card.dataset.loaded = 'error';
+    card.classList.remove('lazy-card');
+    markFlashcardImageLoadFailed(card);
 }
 
 // 應用保存的排序模式
@@ -1259,6 +1263,7 @@ function createLazyFlashcard(imageUrl, word, fileName, timestamp = Date.now(), a
     explanationDiv.className = 'explanation-div';
     explanationDiv.contentEditable = false;
     explanationDiv.dataset.fileName = fileName;
+    setupExplanationCollapseToggle(explanationDiv);
     
     // 创建解释翻译按钮
     const explanationTranslateButton = document.createElement('button');
@@ -1403,7 +1408,15 @@ function createFlashcard(imageUrl, word, fileName, timestamp = Date.now()) {
             }, 1000 * retryCount);
         } else {
             console.error('图片加载失败，已达到最大重试次数:', fileName);
-            // 可以在这里设置一个默认图片或错误提示
+            markFlashcardImageLoadFailed(card);
+            const errPh = document.createElement('div');
+            errPh.className = 'image-placeholder';
+            errPh.innerHTML =
+                '<div class="placeholder-icon">❌</div><div class="placeholder-text">圖片載入失敗</div>';
+            errPh.style.color = '#ff6b6b';
+            if (img.parentNode === card) {
+                card.replaceChild(errPh, img);
+            }
         }
     });
     
@@ -1451,6 +1464,7 @@ function createFlashcard(imageUrl, word, fileName, timestamp = Date.now()) {
     explanationDiv.className = 'explanation-div';
     explanationDiv.contentEditable = false;
     explanationDiv.dataset.fileName = fileName;
+    setupExplanationCollapseToggle(explanationDiv);
     
     // 创建解释翻译按钮
     const explanationTranslateButton = document.createElement('button');
@@ -1695,6 +1709,23 @@ document.addEventListener('DOMContentLoaded', () => {
         hideExplanationCheckbox.checked = true;
         document.body.classList.add('hide-explanation');
     }
+
+    const showFailedFlashcardsCheckbox = document.getElementById('showFailedFlashcards');
+    if (showFailedFlashcardsCheckbox) {
+        showFailedFlashcardsCheckbox.addEventListener('change', function() {
+            localStorage.setItem('showFailedFlashcards', this.checked ? 'true' : 'false');
+            syncHideFailedFlashcardsClass();
+            if (this.checked) {
+                showTemporaryMessage('已顯示圖片載入失敗的單詞卡', 'success');
+            } else {
+                showTemporaryMessage('已隱藏圖片載入失敗的單詞卡', 'success');
+            }
+        });
+        if (localStorage.getItem('showFailedFlashcards') === 'true') {
+            showFailedFlashcardsCheckbox.checked = true;
+        }
+    }
+    syncHideFailedFlashcardsClass();
 
     // 添加視圖控制
     const showImagesOnlyBtn = document.getElementById('showImagesOnly');
@@ -2440,6 +2471,54 @@ function checkAllExplanationTranslateButtons() {
     });
 }
 
+// 解釋欄位展開/縮回（平常只顯示前 3 行）
+function applyExplanationCollapseState(explanationDiv, shouldCollapse) {
+    if (!explanationDiv) return;
+    
+    if (shouldCollapse) {
+        explanationDiv.classList.add('explanation-collapsed');
+        explanationDiv.classList.remove('explanation-expanded');
+        explanationDiv.setAttribute('aria-expanded', 'false');
+    } else {
+        explanationDiv.classList.remove('explanation-collapsed');
+        explanationDiv.classList.add('explanation-expanded');
+        explanationDiv.setAttribute('aria-expanded', 'true');
+    }
+}
+
+function setupExplanationCollapseToggle(explanationDiv) {
+    if (!explanationDiv) return;
+    if (explanationDiv.dataset.collapseToggleBound === 'true') return;
+    
+    explanationDiv.dataset.collapseToggleBound = 'true';
+    explanationDiv.setAttribute('role', 'button');
+    explanationDiv.setAttribute('tabindex', '0');
+    
+    // 默认缩回
+    applyExplanationCollapseState(explanationDiv, true);
+    
+    explanationDiv.addEventListener('click', (e) => {
+        // 编辑模式下让 inline editing 处理
+        if (document.body.classList.contains('edit-mode')) return;
+        
+        // 避免双击时触发两次（双击还可能触发卡片逻辑）
+        if (e.detail === 2) return;
+        
+        e.stopPropagation();
+        const isExpanded = explanationDiv.classList.contains('explanation-expanded');
+        applyExplanationCollapseState(explanationDiv, isExpanded);
+    });
+    
+    explanationDiv.addEventListener('keydown', (e) => {
+        if (document.body.classList.contains('edit-mode')) return;
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        e.preventDefault();
+        
+        const isExpanded = explanationDiv.classList.contains('explanation-expanded');
+        applyExplanationCollapseState(explanationDiv, isExpanded);
+    });
+}
+
 // 为卡片加载完整数据
 async function loadCardDataForCard(wordDiv, chineseNameDiv, explanationDiv, fileName) {
     try {
@@ -2453,12 +2532,16 @@ async function loadCardDataForCard(wordDiv, chineseNameDiv, explanationDiv, file
         chineseNameDiv.textContent = cardData.chineseName;
         
         // 对于解释字段，将换行符转换为HTML换行标签
+        const wasExpanded = explanationDiv.classList.contains('explanation-expanded');
         if (cardData.explanation) {
             const explanationWithBreaks = cardData.explanation.replace(/\n/g, '<br>');
             explanationDiv.innerHTML = explanationWithBreaks;
         } else {
             explanationDiv.innerHTML = '';
         }
+        
+        // 默认缩回；如果用户在当前卡片已展开，则保留展开状态
+        applyExplanationCollapseState(explanationDiv, !wasExpanded);
         
         // 检查解释内容并控制翻译按钮显示
         updateExplanationTranslateButtonVisibility(explanationDiv);
@@ -2468,6 +2551,7 @@ async function loadCardDataForCard(wordDiv, chineseNameDiv, explanationDiv, file
         console.error('加载卡片数据失败:', fileName, error);
         chineseNameDiv.textContent = '';
         explanationDiv.innerHTML = '';
+        applyExplanationCollapseState(explanationDiv, true);
         
         // 即使加载失败也要检查翻译按钮显示
         updateExplanationTranslateButtonVisibility(explanationDiv);
@@ -3749,6 +3833,12 @@ function setupInlineEditing(element, fileName, fieldType, onSave) {
         
         element.contentEditable = true;
         element.classList.add('editing');
+        
+        // 解释字段进入编辑时，先展示完整内容，避免被行数折叠影响编辑
+        if (fieldType === 'explanation') {
+            element.classList.remove('explanation-collapsed', 'explanation-expanded');
+            applyExplanationCollapseState(element, false); // 展开
+        }
         element.focus();
         
         // 选中所有文本
@@ -3791,6 +3881,11 @@ function setupInlineEditing(element, fileName, fieldType, onSave) {
             element.classList.remove('editing');
             isEditing = false;
             
+            if (fieldType === 'explanation') {
+                const shouldCollapse = !document.body.classList.contains('edit-mode');
+                applyExplanationCollapseState(element, shouldCollapse);
+            }
+            
             // 如果是解释字段，检查翻译按钮显示
             if (fieldType === 'explanation') {
                 updateExplanationTranslateButtonVisibility(element);
@@ -3814,6 +3909,11 @@ function setupInlineEditing(element, fileName, fieldType, onSave) {
             element.classList.remove('editing');
             isEditing = false;
             
+            if (fieldType === 'explanation') {
+                const shouldCollapse = !document.body.classList.contains('edit-mode');
+                applyExplanationCollapseState(element, shouldCollapse);
+            }
+            
             showTemporaryMessage('保存失败: ' + error.message, 'error');
         }
     }
@@ -3830,6 +3930,11 @@ function setupInlineEditing(element, fileName, fieldType, onSave) {
         element.contentEditable = false;
         element.classList.remove('editing');
         isEditing = false;
+        
+        if (fieldType === 'explanation') {
+            const shouldCollapse = !document.body.classList.contains('edit-mode');
+            applyExplanationCollapseState(element, shouldCollapse);
+        }
         
         console.log('取消编辑字段:', fieldType, fileName);
     }
