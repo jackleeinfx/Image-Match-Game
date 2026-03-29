@@ -212,6 +212,7 @@ body.hide-failed-flashcards .flashcard.flashcard-load-failed {
 .flashcard .explanation-div.explanation-expanded {
     display: block;
     -webkit-line-clamp: unset;
+    line-clamp: unset;
     overflow: visible;
     white-space: pre-wrap;
 }
@@ -782,6 +783,18 @@ body.edit-mode .flashcard .explanation-div:empty::before {
 .flashcard.show-all .chinese-name-container,
 .flashcard.show-all .explanation-container {
     display: flex !important;
+}
+
+/* 雙擊 show-all 時，覆蓋解釋欄位的三行折疊限制 */
+.flashcard.show-all .explanation-div.explanation-collapsed,
+.flashcard.show-all .explanation-div.explanation-expanded,
+.flashcard.show-all .explanation-div {
+    display: block !important;
+    -webkit-line-clamp: unset !important;
+    line-clamp: unset !important;
+    max-height: none !important;
+    overflow: visible !important;
+    white-space: pre-wrap !important;
 }
 
 /* 完整模式按鈕樣式 */
