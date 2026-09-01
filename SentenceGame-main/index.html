@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>單字卡學習</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script src="https://code.responsivevoice.org/responsivevoice.js?key=C065BhbX"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="checkbox-container">
+            <div class="card-type-selector">
+                <button type="button" class="type-btn active" id="wordTypeBtn">單詞</button>
+                <button type="button" class="type-btn" id="sentenceTypeBtn">長句</button>
+            </div>
+            <label>
+                <input type="checkbox" id="hideAddCard" checked>
+                新增
+            </label>
+            <label>
+                <input type="checkbox" id="hideSettings">
+                設置
+            </label>
+            <div class="playback-box">
+                <div class="playback-row-top">
+                    <span class="playback-label-group">
+                        <label>次數</label>
+                        <input type="number" id="playCountInput" min="1" max="10" value="2">
+                        <label>間隔</label>
+                        <input type="number" id="playIntervalInput" min="1" max="30" value="1">
+                    </span>
+                    <span class="playback-btns">
+                        <button id="playAllCards" class="mode-btn">開始播放</button>
+                        <button id="shuffleCards" class="mode-btn">隨機排列</button>
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <div class="add-card-section">
+            <div class="input-group">
+                <div class="input-row">
+                    <textarea id="englishWord" placeholder="請輸入中文或英文" rows="1"></textarea>
+                    <button id="pasteInputBtn" class="input-action-btn" type="button">一鍵貼上</button>
+                </div>
+                <div class="input-row">
+                    <textarea id="chineseTranslation" placeholder="系統自動翻譯結果（可自行修改）" rows="1"></textarea>
+                    <button id="copyTranslationBtn" class="input-action-btn" type="button">一鍵複製</button>
+                </div>
+            </div>
+            <div class="button-group">
+                <div class="rating-input-group">
+                    <div class="star-rating" id="newCardRating">
+                        <span class="star" data-rating="1">★</span>
+                        <span class="star" data-rating="2">★</span>
+                        <span class="star" data-rating="3">★</span>
+                    </div>
+                    <span id="ratingValue">1</span>
+                </div>
+                <button id="addCard">新增單字卡</button>
+                <button id="translateBtn" class="translate-btn">翻譯</button>
+            </div>
+
+        </div>
+
+        <!-- 顯示和排序控制區（不受隱藏設置控制） -->
+        <div class="control-section hidden">
+            <div class="display-mode">
+                <label>顯示模式：</label>
+                <button id="showAll" class="mode-btn active">顯示全部</button>
+                <button id="showEnglish" class="mode-btn">只顯示英文</button>
+                <button id="showChinese" class="mode-btn">只顯示中文</button>
+                <button id="editMode" class="mode-btn">編輯模式</button>
+                <button id="darkMode" class="mode-btn">夜間模式</button>
+            </div>
+            <div class="display-mode" style="margin-top: 8px;">
+                <label>排序方式：</label>
+                <button id="sortByTime" class="mode-btn active">最新在前</button>
+                <button id="sortByRating" class="mode-btn">按星級</button>
+                <button id="sortByAlphabet" class="mode-btn">按字母</button>
+            </div>
+            <div class="display-mode" style="margin-top: 8px;">
+                <label>類型篩選：</label>
+                <button id="filterAll" class="mode-btn active">全部</button>
+                <button id="filterWord" class="mode-btn">只顯示單詞</button>
+                <button id="filterSentence" class="mode-btn">只顯示長句</button>
+            </div>
+            <div class="display-mode playback-row playback-tts" style="margin-top: 8px;">
+                <label for="ttsEngineSelect">英文朗讀：</label>
+                <select id="ttsEngineSelect" class="tts-select" aria-label="選擇英文語音">
+                    <optgroup label="ResponsiveVoice（雲端・預設較穩）">
+                        <option value="rv:US English Male" selected>RV · 美語男聲</option>
+                        <option value="rv:US English Female">RV · 美語女聲</option>
+                        <option value="rv:UK English Male">RV · 英國男聲</option>
+                        <option value="rv:UK English Female">RV · 英國女聲</option>
+                        <option value="rv:Australian Female">RV · 澳洲女聲</option>
+                        <option value="rv:Indian English Female">RV · 印度英語女聲</option>
+                    </optgroup>
+                    <optgroup label="Web Speech（裝置內建・手機常較自然）">
+                        <option value="ws:auto">內建 · 自動挑英文最佳</option>
+                        <option value="ws:en-US">內建 · 美式 en-US</option>
+                        <option value="ws:en-GB">內建 · 英式 en-GB</option>
+                    </optgroup>
+                </select>
+            </div>
+        </div>
+
+        <div class="cards-container" id="cardsContainer">
+            <!-- 單字卡將在這裡動態生成 -->
+        </div>
+        <div id="loadMoreTrigger" class="load-more-trigger"></div>
+    </div>
+    <script src="main.js"></script>
+</body>
+</html> 

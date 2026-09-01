@@ -1,239 +1,257 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#1a1a1a">
-    <title>圖片搜尋與單詞卡</title>
-    <link rel="stylesheet" href="styles.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>學習工具整合入口</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { height: 100%; font-family: system-ui, "Segoe UI", "Microsoft JhengHei", sans-serif; background: #f0f2f5; }
+        :root { --top-h: 52px; --accent: #1f6feb; }
+
+        /* 頂部工具列 */
+        .top-bar {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+            height: var(--top-h);
+            display: flex; align-items: center; gap: 14px;
+            padding: 0 14px;
+            background: #1a2233; color: #fff;
+            box-shadow: 0 2px 8px rgba(0,0,0,.2);
+        }
+        .brand { font-weight: 600; font-size: 15px; white-space: nowrap; }
+        .brand small { display: block; font-weight: 400; font-size: 11px; color: #9fb0c9; }
+
+        .tabs { display: flex; gap: 6px; margin-left: 8px; }
+        .tab {
+            border: 1px solid rgba(255,255,255,.25);
+            background: transparent; color: #d7e0ee;
+            padding: 7px 14px; border-radius: 8px;
+            font-size: 14px; cursor: pointer;
+            transition: all .15s ease; white-space: nowrap;
+        }
+        .tab:hover { background: rgba(255,255,255,.08); }
+        .tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+        .status { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+        .status-text { font-size: 12px; color: #b9c6d8; white-space: nowrap; }
+        .status-text.ok { color: #4ade80; }
+        .status-text.err { color: #f87171; }
+        .act-btn {
+            border: 1px solid rgba(255,255,255,.25); background: transparent;
+            color: #e2e8f0; padding: 5px 10px; border-radius: 6px;
+            font-size: 12px; cursor: pointer; white-space: nowrap;
+        }
+        .act-btn:hover { background: rgba(255,255,255,.1); }
+        .act-btn:disabled { opacity: .6; cursor: default; }
+
+        /* 內容區（放 iframe） */
+        main { position: fixed; top: var(--top-h); left: 0; right: 0; bottom: 0; }
+        .frame-wrap { position: absolute; inset: 0; display: none; }
+        .frame-wrap.active { display: block; }
+        .frame-wrap iframe { width: 100%; height: 100%; border: 0; display: block; }
+
+        /* 載入中遮罩 */
+        .loader {
+            position: absolute; inset: 0; display: flex;
+            flex-direction: column; align-items: center; justify-content: center;
+            background: #f0f2f5; color: #64748b; font-size: 14px; gap: 10px; z-index: 5;
+        }
+        .spinner {
+            width: 30px; height: 30px; border-radius: 50%;
+            border: 3px solid #cbd5e1; border-top-color: var(--accent);
+            animation: spin .8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        @media (max-width: 640px) {
+            .brand small { display: none; }
+            .status-text { max-width: 110px; overflow: hidden; text-overflow: ellipsis; }
+        }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <div class="top-controls">
-            <button id="topShuffleButton" class="shuffle-button">隨機排序單詞卡</button>
+    <header class="top-bar">
+        <div class="brand">學習工具<small>兩個工具整合入口</small></div>
+        <nav class="tabs">
+            <button id="tabImage" class="tab active">🖼️ 圖片搜尋</button>
+            <button id="tabSentence" class="tab">📚 單字卡</button>
+        </nav>
+        <div class="status">
+            <span id="actStatus" class="status-text">啟動中…</span>
+            <button id="actNowBtn" class="act-btn" title="立即用輕量封包啟動兩個 Supabase 帳號">保持啟動</button>
         </div>
+    </header>
 
-        <div class="settings">
-            <button id="toggleSettings" class="toggle-button">≡</button>
-            <div class="settings-content">
-                <label>
-                    <input type="checkbox" id="hideControls"> 僅顯示單詞卡
-                </label>
-                <label>
-                    <input type="checkbox" id="hideChineseName"> 隱藏中文名
-                </label>
-                <label>
-                    <input type="checkbox" id="hideExplanation"> 隱藏解釋
-                </label>
-                <label title="預設隱藏圖片無法載入的單詞卡；勾選後可查看以便刪除或修正">
-                    <input type="checkbox" id="showFailedFlashcards"> 顯示圖片載入失敗的單詞卡
-                </label>
-                <div class="size-control">
-                    <label for="cardSize">卡片大小：</label>
-                    <input type="range" id="cardSize" min="100" max="300" value="250">
-                    <span id="sizeValue">250px</span>
-                </div>
-                <div class="speech-rate-control">
-                    <label for="speechRate">語音速度：</label>
-                    <input type="range" id="speechRate" min="0.3" max="1" step="0.1" value="0.8">
-                    <span id="speechRateValue">0.8x</span>
-                </div>
-                <div class="view-controls">
-                    <button id="showImagesOnly">純圖片模式</button>
-                    <button id="showWordsOnly">純單詞模式</button>
-                    <button id="showComplete">完整模式</button>
-                    <button id="shuffleCards">隨機排序</button>
-                </div>
-                <div class="edit-mode-control">
-                    <button id="toggleEditMode" class="edit-mode-button">✏️ 編輯模式</button>
-                </div>
-                <div class="sort-controls">
-                    <small style="color: #a0aec0; margin-bottom: 5px; display: block;">時間排序:</small>
-                    <button id="sortByTimeDesc">⏰ 最新優先</button>
-                    <button id="sortByTimeAsc">⏳ 最舊優先</button>
-                </div>
-            </div>
+    <main>
+        <div class="frame-wrap active" id="wrapImage">
+            <div class="loader" id="loaderImage"><div class="spinner"></div><div>載入中…</div></div>
+            <iframe id="frameImage" title="圖片搜尋與單詞卡"></iframe>
         </div>
+        <div class="frame-wrap" id="wrapSentence">
+            <div class="loader" id="loaderSentence"><div class="spinner"></div><div>載入中…</div></div>
+            <iframe id="frameSentence" title="單字卡學習"></iframe>
+        </div>
+    </main>
 
-        <div class="search-section" id="controlSection">
-            <input type="text" id="searchInput" placeholder="請輸入搜尋關鍵字">
-            <button id="prevPage" class="page-button">←</button>
-            <button id="searchButton">搜尋圖片</button>
-            <button id="nextPage" class="page-button">→</button>
-        </div>
+    <script>
+    // ============================================================
+    // 這份整合頁面「不改動」底下兩個工具各自的 API 設定。
+    // 這裡只記錄了兩組 Supabase 專案資訊，用來在開啟頁面時，
+    // 以「極輕量封包」各自打一次資料庫查詢，讓免費版帳號一週內保持活躍、不被暫停。
+    // ============================================================
+    var APPS = [
+        {
+            id: 'Image',
+            tabId: 'tabImage',
+            wrapId: 'wrapImage',
+            frameId: 'frameImage',
+            loaderId: 'loaderImage',
+            src: 'Image-Match-Game-main/index.html',
+            label: '圖片搜尋',
+            // Supabase 專案設定（維持原樣，不更動）
+            supabaseUrl: 'https://lnuguottscfwsmthmrkv.supabase.co',
+            supabaseKey: 'sb_publishable_kywRcUbkTQza7NwH8N4_Fg_oE0h4tSj',
+            pingTable: 'flashcard_explanations'
+        },
+        {
+            id: 'Sentence',
+            tabId: 'tabSentence',
+            wrapId: 'wrapSentence',
+            frameId: 'frameSentence',
+            loaderId: 'loaderSentence',
+            src: 'SentenceGame-main/index.html',
+            label: '單字卡',
+            // Supabase 專案設定（維持原樣，不更動）
+            supabaseUrl: 'https://fsqjuteaoprcrdsphqpt.supabase.co',
+            supabaseKey: 'sb_publishable_DIcf1pkMLybWGtAafbLABw_FZ4GQEs8',
+            pingTable: 'user_cards'
+        }
+    ];
 
-        <div id="searchResults" class="image-grid"></div>
-        
-        <div id="dropZone" class="drop-zone">
-            <p>將圖片拖放到這裡</p>
-            <div class="upload-buttons">
-                <input type="file" id="fileInput" accept="image/*" style="display: none;" multiple>
-                <button id="selectImageBtn" class="select-image-button">📷 選擇照片</button>
-                <button id="pasteImageBtn" class="paste-image-button">📋 貼上剪貼簿圖片</button>
-            </div>
-        </div>
-        
-        <!-- 群組控制區域 -->
-        <div class="groups-section">
-            <div id="groupsList" class="groups-list">
-                <button id="addGroupBtn" class="add-group-button">+ 新增群組</button>
-                <button id="noGroupBtn" class="no-group-button" title="無群組圖卡"></button>
-                <!-- 其他群組按鍵會動態添加到這裡 -->
-            </div>
-        </div>
+    // 每 6 天才需要啟動一次（配合 Supabase 免費版「7 天沒活動就會暫停」）
+    var ACTIVATE_INTERVAL_MS = 6 * 24 * 60 * 60 * 1000;
+    var LAST_ACTIVATE_KEY = 'integrated_learn_tools_last_activate';
 
-        <div class="flashcards-section">
-            <h2>單詞卡</h2>
-            <div id="flashcards"></div>
-        </div>
-    </div>
+    function nowMs() { return Date.now(); }
 
-    <!-- 解释输入弹窗 -->
-    <div id="explanationModal" class="modal-overlay">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 id="modalTitle">創建單詞卡</h3>
-                <button class="modal-close" id="modalCloseBtn">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="input-group">
-                    <label for="wordInput">單詞：</label>
-                    <input type="text" id="wordInput" placeholder="請輸入單詞">
-                </div>
-                <div class="input-group">
-                    <label for="chineseNameInput">中文名：</label>
-                    <input type="text" id="chineseNameInput" placeholder="請輸入中文名稱">
-                </div>
-                <div class="input-group">
-                    <label for="explanationTextarea">解釋內容：</label>
-                    <textarea id="explanationTextarea" placeholder="請輸入對這個單詞的解釋..."></textarea>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button id="modalCancelBtn" class="modal-btn cancel-btn">取消</button>
-                <button id="modalConfirmBtn" class="modal-btn confirm-btn">確定</button>
-            </div>
-        </div>
-    </div>
+    // 對單一 Supabase 專案送出「極輕量」的讀取封包（選取 1 列、僅 id 欄位 → 回應極小）
+    // 這會被算作真實資料庫活動，足以讓免費專案保持活躍、不被暫停。
+    async function pingProject(app) {
+        var url = app.supabaseUrl.replace(/\/+$/, '') + '/rest/v1/' + app.pingTable +
+                  '?select=id&limit=1';
+        var res = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'apikey': app.supabaseKey,
+                'Authorization': 'Bearer ' + app.supabaseKey,
+                'Accept': 'application/json'
+            },
+            cache: 'no-store'
+        });
+        if (!res.ok) {
+            throw new Error(app.label + ' 啟動失敗 (HTTP ' + res.status + ')');
+        }
+        // 讀取完畢再結束（即便回應很小）
+        await res.text();
+    }
 
-    <!-- 删除确认弹窗 -->
-    <div id="deleteConfirmModal" class="modal-overlay">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>確認刪除</h3>
-                <button class="modal-close" id="deleteModalCloseBtn">&times;</button>
-            </div>
-            <div class="modal-body">
-                <p id="deleteConfirmMessage">確定要刪除這張單詞卡嗎？此操作無法撤銷。</p>
-            </div>
-            <div class="modal-footer">
-                <button id="deleteCancelBtn" class="modal-btn cancel-btn">取消</button>
-                <button id="deleteConfirmBtn" class="modal-btn confirm-btn">確定刪除</button>
-            </div>
-        </div>
-    </div>
+    var _activating = false;
+    async function activateAll(force) {
+        if (_activating) return;
+        _activating = true;
+        var btn = document.getElementById('actNowBtn');
+        var st = document.getElementById('actStatus');
+        if (btn) btn.disabled = true;
 
-    <!-- 群組編輯弹窗 -->
-    <div id="groupEditModal" class="modal-overlay">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 id="groupModalTitle">編輯群組</h3>
-                <button class="modal-close" id="groupModalCloseBtn">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="input-group">
-                    <label for="groupNameInput">群組名稱：</label>
-                    <input type="text" id="groupNameInput" placeholder="請輸入群組名稱">
-                </div>
-                <div class="input-group">
-                    <label>群組顏色：</label>
-                    <div id="colorPicker" class="color-picker">
-                        <!-- 24種顏色會動態生成 -->
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button id="groupDeleteBtn" class="modal-btn delete-btn">刪除群組</button>
-                <button id="groupCancelBtn" class="modal-btn cancel-btn">取消</button>
-                <button id="groupConfirmBtn" class="modal-btn confirm-btn">確定</button>
-            </div>
-        </div>
-    </div>
+        try {
+            var lastRaw = localStorage.getItem(LAST_ACTIVATE_KEY);
+            var last = lastRaw ? parseInt(lastRaw, 10) : 0;
+            if (!force && last && (nowMs() - last) < ACTIVATE_INTERVAL_MS) {
+                // 6 天內才啟動過，不需要再啟動
+                var remain = ACTIVATE_INTERVAL_MS - (nowMs() - last);
+                st.textContent = '已保持啟動（約 ' + Math.ceil(remain / (24 * 3600 * 1000)) + ' 天後再自動啟動）';
+                st.className = 'status-text ok';
+                if (btn) btn.disabled = false;
+                return;
+            }
 
-    <!-- 群組選擇弹窗 -->
-    <div id="groupSelectModal" class="modal-overlay">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>選擇群組</h3>
-                <button class="modal-close" id="groupSelectModalCloseBtn">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div id="groupSelectList" class="group-select-list">
-                    <!-- 群組選項會動態生成 -->
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button id="groupSelectCancelBtn" class="modal-btn cancel-btn">取消</button>
-            </div>
-        </div>
-    </div>
+            st.textContent = '正在啟動兩個帳號…';
+            st.className = 'status-text';
 
-    <!-- 刪除群組確認弹窗 -->
-    <div id="deleteGroupModal" class="modal-overlay">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>確認刪除群組</h3>
-                <button class="modal-close" id="deleteGroupModalCloseBtn">&times;</button>
-            </div>
-            <div class="modal-body">
-                <p>確定要刪除群組 "<span id="deleteGroupName"></span>" 嗎？</p>
-                <p class="warning-text">此操作無法撤銷，所有分配到此群組的圖卡將變為未分組狀態。</p>
-            </div>
-            <div class="modal-footer">
-                <button id="deleteGroupCancelBtn" class="modal-btn cancel-btn">取消</button>
-                <button id="deleteGroupConfirmBtn" class="modal-btn delete-btn">確定刪除</button>
-            </div>
-        </div>
-    </div>
+            var results = await Promise.allSettled(APPS.map(function (app) {
+                return pingProject(app);
+            }));
 
-    <!-- 剪貼簿貼圖彈窗 -->
-    <div id="pasteImageModal" class="modal-overlay">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>從剪貼簿添加圖片</h3>
-                <button class="modal-close" id="pasteImageModalCloseBtn">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="paste-preview-container">
-                    <img id="pasteImagePreview" src="" alt="剪貼簿圖片預覽" style="display: none;">
-                    <div id="pasteImagePlaceholder" class="paste-placeholder">
-                        <div class="paste-icon">📋</div>
-                        <p>正在讀取剪貼簿圖片...</p>
-                    </div>
-                </div>
-                <div class="input-group">
-                    <label for="pasteWordInput">單詞：</label>
-                    <input type="text" id="pasteWordInput" placeholder="請輸入這張圖片的單詞">
-                </div>
-                <div class="input-group">
-                    <label for="pasteChineseNameInput">中文名：</label>
-                    <input type="text" id="pasteChineseNameInput" placeholder="請輸入中文名稱（可選）">
-                </div>
-                <div class="input-group">
-                    <label for="pasteExplanationInput">解釋內容：</label>
-                    <textarea id="pasteExplanationInput" placeholder="請輸入對這個單詞的解釋...（可選）"></textarea>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button id="pasteImageCancelBtn" class="modal-btn cancel-btn">取消</button>
-                <button id="pasteImageConfirmBtn" class="modal-btn confirm-btn">添加圖卡</button>
-            </div>
-        </div>
-    </div>
+            var allOk = results.every(function (r) { return r.status === 'fulfilled'; });
+            localStorage.setItem(LAST_ACTIVATE_KEY, String(nowMs()));
 
-    <!-- Supabase SDK -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://code.responsivevoice.org/responsivevoice.js?key=C065BhbX"></script>
-    <script src="main.js"></script>
+            if (allOk) {
+                st.textContent = '✅ 兩個 Supabase 帳號已啟動，6 天內將保持活躍';
+                st.className = 'status-text ok';
+            } else {
+                var fail = results.map(function (r, i) {
+                    return r.status === 'rejected' ? APPS[i].label + '(' + (r.reason && r.reason.message || '未知錯誤') + ')' : null;
+                }).filter(Boolean).join('、');
+                st.textContent = '⚠️ 部分啟動失敗：' + fail;
+                st.className = 'status-text err';
+            }
+        } catch (e) {
+            st.textContent = '⚠️ 啟動程序發生錯誤：' + (e && e.message || e);
+            st.className = 'status-text err';
+        } finally {
+            _activating = false;
+            if (btn) btn.disabled = false;
+        }
+    }
+// ------------------------------------------------------------------
+    // 頁籤切換（延遲載入 iframe，切換時才載入目標工具，保持輕量）
+    // ------------------------------------------------------------------
+    var ACTIVE_TAB_KEY = 'integrated_learn_tools_active';
+
+    function loadFrame(app) {
+        var iframe = document.getElementById(app.frameId);
+        if (!iframe.getAttribute('src')) {
+            iframe.setAttribute('src', app.src);
+            // iframe 載入完成後隱藏該工具自己的載入遮罩
+            iframe.addEventListener('load', function () {
+                var loader = document.getElementById(app.loaderId);
+                if (loader) loader.style.display = 'none';
+            });
+        }
+    }
+
+    function switchTab(app) {
+        APPS.forEach(function (a) {
+            document.getElementById(a.wrapId).classList.toggle('active', a.id === app.id);
+            document.getElementById(a.tabId).classList.toggle('active', a.id === app.id);
+        });
+        loadFrame(app);
+        try { localStorage.setItem(ACTIVE_TAB_KEY, app.id); } catch (e) {}
+    }
+
+    function bindTabs() {
+        APPS.forEach(function (app) {
+            document.getElementById(app.tabId).addEventListener('click', function () {
+                switchTab(app);
+            });
+        });
+        var btn = document.getElementById('actNowBtn');
+        if (btn) btn.addEventListener('click', function () { activateAll(true); });
+    }
+
+    // ------------------------------------------------------------------
+    // 啟動
+    // ------------------------------------------------------------------
+    document.addEventListener('DOMContentLoaded', function () {
+        bindTabs();
+        // 恢復上次使用的頁籤
+        var saved = null;
+        try { saved = localStorage.getItem(ACTIVE_TAB_KEY); } catch (e) {}
+        var initial = APPS.find(function (a) { return a.id === saved; }) || APPS[0];
+        // 預設載入該頁籤，並開始自動啟動兩個帳號
+        switchTab(initial);
+        activateAll(false);
+    });
+    </script>
 </body>
-</html> 
+</html>

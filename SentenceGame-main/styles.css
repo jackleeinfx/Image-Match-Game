@@ -1,0 +1,956 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f0f0f0;
+    padding: 20px;
+    touch-action: manipulation;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+}
+
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.add-card-section {
+    background-color: white;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.add-card-section input,
+.add-card-section textarea {
+    width: 100%;
+    padding: 10px;
+    margin: 0;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 16px;
+}
+
+.add-card-section textarea {
+    min-height: 42px;
+    resize: none;
+    overflow-y: hidden;
+    white-space: pre-wrap;
+    word-break: normal;
+    overflow-wrap: normal;
+}
+
+.add-card-section input[readonly],
+.add-card-section textarea[readonly] {
+    background-color: #f5f5f5;
+    color: #666;
+    cursor: not-allowed;
+}
+
+button {
+    background-color: #4CAF50;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+button:hover {
+    background-color: #45a049;
+}
+
+.flashcard {
+    background-color: white;
+    padding: 20px;
+    margin: 10px 0;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    cursor: pointer;
+    width: 250px;
+    min-height: 120px;
+    transition: all 0.3s ease;
+    flex-grow: 0;
+    flex-shrink: 0;
+    word-wrap: break-word;
+    overflow-wrap: anywhere;
+    overflow: hidden;
+    position: relative;
+    max-width: 100%;
+}
+
+.flashcard .english {
+    /* 分類標籤在上、內文在下：讓出上方空間給標籤 */
+    margin-top: 22px;
+    margin-bottom: 10px;
+    word-break: break-word;
+    white-space: pre-wrap;
+    transition: font-size 0.3s ease;
+}
+
+.flashcard .chinese {
+    color: #666;
+    display: none;
+    word-break: break-word;
+    white-space: pre-wrap;
+    transition: font-size 0.3s ease;
+}
+
+.flashcard.flipped .chinese {
+    display: block;
+}
+
+.control-panel {
+    background-color: white;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.control-section {
+    background-color: white;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.input-container {
+    margin: 10px 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+}
+
+.input-container label {
+    white-space: nowrap;
+}
+
+.input-container input[type="number"] {
+    width: 80px;
+    padding: 5px 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    text-align: center;
+}
+
+.input-container span {
+    font-size: 14px;
+    color: #666;
+}
+
+.cards-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    justify-content: flex-start;
+}
+
+.load-more-trigger {
+    height: 1px;
+}
+
+.display-mode {
+    margin-top: 15px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.display-mode label {
+    font-size: 14px;
+    white-space: nowrap;
+}
+
+.playback-row {
+    flex-wrap: wrap;
+    gap: 8px 10px;
+}
+
+.playback-row input[type="number"] {
+    width: 72px;
+    padding: 5px 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    text-align: center;
+}
+
+body.dark-mode .playback-row input[type="number"] {
+    background-color: #1a1a1a;
+    border-color: #404040;
+    color: #ffffff;
+}
+
+.playback-tts {
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+}
+
+.playback-tts .tts-select {
+    flex: 1 1 min(100%, 280px);
+    min-width: 0;
+    max-width: 100%;
+    padding: 6px 8px;
+    font-size: 13px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: #fff;
+}
+
+.playback-tts label {
+    flex-shrink: 0;
+}
+
+body.dark-mode .playback-tts .tts-select {
+    background-color: #1a1a1a;
+    border-color: #404040;
+    color: #ffffff;
+}
+
+.mode-btn {
+    background-color: #f0f0f0;
+    color: #333;
+    padding: 6px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 13px;
+    min-height: 30px;
+    height: auto;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.mode-btn.active {
+    background-color: #4CAF50;
+    color: white;
+    border-color: #4CAF50;
+}
+
+#playAllCards {
+    background-color: #4CAF50;
+    color: white;
+    border-color: #4CAF50;
+}
+
+#playAllCards.is-stopping {
+    background-color: #e53935;
+    color: white;
+    border-color: #e53935;
+}
+
+.mode-btn:disabled {
+    background-color: #e0e0e0;
+    color: #999;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+/* 修改卡片顯示模式的相關樣式 */
+.flashcard.mode-english .chinese,
+.flashcard.mode-chinese .english {
+    display: none;
+}
+
+.flashcard.mode-all .chinese,
+.flashcard.mode-chinese .chinese {
+    display: block;
+}
+
+.delete-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background-color: transparent;
+    color: #666;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: bold;
+    border: none;
+    z-index: 1;
+    transition: all 0.2s ease;
+    opacity: 0.6;
+}
+
+/* 編輯按鈕：位於刪除鍵左側 */
+.edit-btn {
+    position: absolute;
+    top: 8px;
+    right: 40px;
+    background-color: transparent;
+    color: #666;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 15px;
+    border: none;
+    z-index: 1;
+    transition: all 0.2s ease;
+    opacity: 0.6;
+}
+
+.edit-btn:hover {
+    background-color: #1976d2;
+    color: white;
+    opacity: 1;
+    transform: scale(1.05);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.flashcard .edit-btn {
+    display: flex;
+}
+
+/* 卡片內嵌編輯 */
+.flashcard.editing {
+    cursor: default;
+}
+
+.edit-textarea {
+    width: 100%;
+    min-height: 42px;
+    padding: 6px 8px;
+    margin: 0 0 6px;
+    border: 1px solid #90caf9;
+    border-radius: 6px;
+    font-size: 14px;
+    font-family: inherit;
+    resize: none; /* 由程式依內容自動增高，不出現捲動條 */
+    overflow: hidden;
+    box-sizing: border-box;
+    background-color: #fff;
+    color: #333;
+    display: block;
+}
+
+.edit-textarea.edit-zh {
+    margin-top: 4px;
+}
+
+body.dark-mode .edit-textarea {
+    background-color: #1a1a1a;
+    border-color: #404040;
+    color: #fff;
+}
+
+.edit-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.edit-actions button {
+    flex: 1;
+}
+
+.edit-save {
+    background-color: #4CAF50;
+}
+
+.edit-cancel {
+    background-color: #9e9e9e;
+}
+
+.edit-cancel:hover {
+    background-color: #757575;
+}
+
+.delete-btn:hover {
+    background-color: #ff4444;
+    color: white;
+    opacity: 1;
+    transform: scale(1.05);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.flashcard .delete-btn {
+    display: flex;
+}
+
+/* 添加夜間模式相關樣式 */
+body.dark-mode {
+    background-color: #1a1a1a;
+    color: #ffffff;
+}
+
+body.dark-mode .add-card-section,
+body.dark-mode .control-panel,
+body.dark-mode .control-section,
+body.dark-mode .flashcard {
+    background-color: #2d2d2d;
+    color: #ffffff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+body.dark-mode .add-card-section input,
+body.dark-mode .add-card-section textarea {
+    background-color: #1a1a1a;
+    border-color: #404040;
+    color: #ffffff;
+}
+
+body.dark-mode .add-card-section input[readonly],
+body.dark-mode .add-card-section textarea[readonly] {
+    background-color: #222;
+    color: #b3b3b3;
+}
+
+body.dark-mode .input-container input[type="number"] {
+    background-color: #1a1a1a;
+    border-color: #404040;
+    color: #ffffff;
+}
+
+body.dark-mode .input-container span {
+    color: #b3b3b3;
+}
+
+body.dark-mode .mode-btn {
+    background-color: #404040;
+    color: #ffffff;
+    border-color: #505050;
+}
+
+body.dark-mode .mode-btn.active {
+    background-color: #4CAF50;
+    border-color: #4CAF50;
+}
+
+body.dark-mode #playAllCards {
+    background-color: #4CAF50;
+    border-color: #4CAF50;
+}
+
+body.dark-mode #playAllCards.is-stopping {
+    background-color: #e53935;
+    border-color: #e53935;
+}
+
+body.dark-mode .mode-btn:disabled {
+    background-color: #333;
+    color: #666;
+}
+
+body.dark-mode .flashcard .chinese {
+    color: #b3b3b3;
+}
+
+/* 修改滑軌顏色 */
+body.dark-mode input[type="range"] {
+    background-color: #404040;
+}
+
+body.dark-mode input[type="range"]::-webkit-slider-thumb {
+    background: #4CAF50;
+}
+
+body.dark-mode input[type="range"]::-moz-range-thumb {
+    background: #4CAF50;
+}
+
+@keyframes shuffleAnimation {
+    0% {
+        opacity: 0;
+        transform: scale(0.8) translateY(-20px);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.input-group {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.input-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+}
+
+.input-row input,
+.input-row textarea {
+    flex: 1;
+}
+
+.input-action-btn {
+    background-color: #607d8b;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 10px 14px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.input-action-btn:hover {
+    background-color: #546e7a;
+}
+
+.translate-btn {
+    padding: 10px 15px;
+    background-color: #2196F3;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.translate-btn:hover {
+    background-color: #1976D2;
+}
+
+.translate-btn:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+}
+
+.button-group {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+    justify-content: flex-end;
+    align-items: center;
+    flex-wrap: nowrap;
+}
+
+.input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.translate-btn {
+    background-color: #2196F3;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    padding: 10px 20px;
+}
+
+.translate-btn:hover {
+    background-color: #1976D2;
+}
+
+.translate-btn:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+}
+
+.checkbox-container {
+    background-color: white;
+    padding: 12px 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 20px;
+}
+
+.checkbox-container label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+.checkbox-container input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+/* 夜間模式樣式 */
+body.dark-mode .checkbox-container {
+    background-color: #2d2d2d;
+    color: #ffffff;
+}
+
+/* 播放設定盒：佔滿整行並換行，與分類／勾選項分開 */
+.playback-box {
+    flex: 1 1 100%;
+    margin-top: 2px;
+    padding-top: 0;
+}
+
+.playback-row-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px 16px;
+}
+
+.playback-label-group {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px 8px;
+}
+
+.playback-label-group label {
+    font-size: 14px;
+    color: #555;
+    cursor: default;
+}
+
+.playback-label-group input[type="number"] {
+    width: 64px;
+    padding: 5px 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    text-align: center;
+    font-size: 14px;
+}
+
+.playback-btns {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+body.dark-mode .playback-label-group label {
+    color: #ccc;
+}
+
+body.dark-mode .playback-label-group input[type="number"] {
+    background-color: #1a1a1a;
+    border-color: #404040;
+    color: #fff;
+}
+
+body.dark-mode .input-action-btn {
+    background-color: #455a64;
+}
+
+body.dark-mode .input-action-btn:hover {
+    background-color: #37474f;
+}
+
+/* 隱藏新增單詞卡區塊的樣式 */
+.add-card-section.hidden {
+    display: none;
+}
+
+/* 隱藏控制面板的樣式 */
+.control-panel.hidden {
+    display: none;
+}
+
+.control-section.hidden {
+    display: none;
+}
+
+/* 刪除按鈕位置已在上方定義 */
+
+/* 星級評分樣式 */
+.rating-input-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 10px 0;
+    justify-content: flex-end;
+}
+
+.button-group .rating-input-group {
+    margin: 0;
+}
+
+#ratingValue {
+    display: none;
+}
+
+.star-rating {
+    display: flex;
+    gap: 2px;
+}
+
+.star {
+    font-size: 24px;
+    color: #ddd;
+    cursor: pointer;
+    transition: color 0.2s ease;
+    user-select: none;
+}
+
+.star:hover,
+.star.active {
+    color: #ffd700;
+}
+
+.star.hover {
+    color: #ffed4e;
+}
+
+/* 卡片中的星級顯示 */
+.card-rating {
+    position: absolute;
+    top: 8px;
+    left: 56px;
+    display: flex;
+    gap: 1px;
+    font-size: 14px;
+}
+
+.card-rating .star {
+    font-size: 14px;
+    cursor: default;
+}
+
+.card-rating .star.filled {
+    color: #ffd700;
+}
+
+.card-rating .star.empty {
+    color: #ddd;
+}
+
+/* 星級始終可點擊 */
+.flashcard .card-rating .star {
+    cursor: pointer;
+    font-size: 16px;
+}
+
+.flashcard .card-rating .star:hover {
+    color: #ffed4e;
+}
+
+/* 夜間模式下的星級樣式 */
+body.dark-mode .star {
+    color: #666;
+}
+
+body.dark-mode .star:hover,
+body.dark-mode .star.active,
+body.dark-mode .card-rating .star.filled {
+    color: #ffd700;
+}
+
+body.dark-mode .card-rating .star.empty {
+    color: #444;
+}
+
+/* 夜間模式下的刪除按鈕樣式 */
+body.dark-mode .delete-btn {
+    color: #ccc;
+    background-color: transparent;
+}
+
+body.dark-mode .delete-btn:hover {
+    background-color: #ff5555;
+    color: white;
+}
+
+/* 夜間模式下的編輯按鈕樣式 */
+body.dark-mode .edit-btn {
+    color: #ccc;
+    background-color: transparent;
+}
+
+body.dark-mode .edit-btn:hover {
+    background-color: #1976d2;
+    color: white;
+}
+
+/* 統一按鈕尺寸 */
+.mode-btn,
+.translate-btn,
+.input-action-btn,
+#addCard {
+    min-height: 36px;
+    padding: 8px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.button-group .rating-input-group {
+    min-height: 36px;
+}
+
+@media (max-width: 768px) {
+    .container {
+        max-width: 100%;
+        padding: 0 10px;
+    }
+
+    .cards-container {
+        gap: 12px;
+        justify-content: center;
+    }
+
+    .flashcard {
+        width: 100%;
+    }
+
+    .control-section .display-mode {
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .control-section .mode-btn {
+        font-size: 12px;
+        padding: 8px 10px;
+        min-height: 34px;
+    }
+
+    .button-group {
+        gap: 6px;
+        justify-content: flex-end;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .input-group {
+        gap: 2px;
+    }
+
+    .input-row {
+        gap: 4px;
+    }
+
+    .button-group .rating-input-group {
+        gap: 4px;
+    }
+
+    .button-group .star {
+        font-size: 16px;
+    }
+
+    .mode-btn,
+    .translate-btn,
+    .input-action-btn,
+    #addCard {
+        min-height: 32px;
+        padding: 6px 10px;
+        font-size: 12px;
+    }
+
+    .playback-row {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        white-space: nowrap;
+    }
+
+    .playback-row input[type="number"] {
+        width: 52px;
+        padding: 4px 6px;
+        font-size: 12px;
+    }
+
+    .playback-row label,
+    .playback-row span {
+        font-size: 12px;
+    }
+}
+
+/* ===== 分類徽章 ===== */
+.card-type-badge {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 1;
+    font-size: 11px;
+    line-height: 1;
+    padding: 4px 8px;
+    border-radius: 10px;
+    font-weight: bold;
+    color: #fff;
+    cursor: pointer;
+    user-select: none;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.card-type-badge:hover {
+    box-shadow: 0 0 0 2px rgba(255,255,255,0.8);
+    transform: scale(1.08);
+}
+.card-type-badge.word {
+    background-color: #2196f3;
+}
+.card-type-badge.sentence {
+    background-color: #ff9800;
+}
+
+/* ===== 新增卡分類選擇器 ===== */
+.card-type-selector {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+}
+.card-type-label {
+    font-size: 14px;
+    color: #666;
+}
+.type-btn {
+    background-color: #e0e0e0;
+    color: #444;
+    padding: 6px 16px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s ease;
+}
+.type-btn:hover {
+    background-color: #cfd8dc;
+}
+.type-btn.active {
+    background-color: #2196f3;
+    color: #fff;
+}
+
+/* 「長句」按鈕與卡片上的長句標籤同為橘色 */
+#sentenceTypeBtn.active {
+    background-color: #ff9800;
+    color: #fff;
+}
+
+/* 夜間模式 */
+body.dark-mode .card-type-label {
+    color: #bbb;
+}
+body.dark-mode .type-btn {
+    background-color: #3a3a3a;
+    color: #ccc;
+}
+body.dark-mode .type-btn:hover {
+    background-color: #4a4a4a;
+}
+body.dark-mode .type-btn.active {
+    background-color: #1e88e5;
+    color: #fff;
+}
+/* 夜間模式下長句按鈕仍維持橘色，與卡片長句標籤一致 */
+body.dark-mode #sentenceTypeBtn.active {
+    background-color: #ff9800;
+    color: #fff;
+}
