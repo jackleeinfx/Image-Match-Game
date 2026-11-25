@@ -1,257 +1,131 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="zh-Hant" data-theme="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>學習工具整合入口</title>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        html, body { height: 100%; font-family: system-ui, "Segoe UI", "Microsoft JhengHei", sans-serif; background: #f0f2f5; }
-        :root { --top-h: 52px; --accent: #1f6feb; }
-
-        /* 頂部工具列 */
-        .top-bar {
-            position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
-            height: var(--top-h);
-            display: flex; align-items: center; gap: 14px;
-            padding: 0 14px;
-            background: #1a2233; color: #fff;
-            box-shadow: 0 2px 8px rgba(0,0,0,.2);
-        }
-        .brand { font-weight: 600; font-size: 15px; white-space: nowrap; }
-        .brand small { display: block; font-weight: 400; font-size: 11px; color: #9fb0c9; }
-
-        .tabs { display: flex; gap: 6px; margin-left: 8px; }
-        .tab {
-            border: 1px solid rgba(255,255,255,.25);
-            background: transparent; color: #d7e0ee;
-            padding: 7px 14px; border-radius: 8px;
-            font-size: 14px; cursor: pointer;
-            transition: all .15s ease; white-space: nowrap;
-        }
-        .tab:hover { background: rgba(255,255,255,.08); }
-        .tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
-
-        .status { margin-left: auto; display: flex; align-items: center; gap: 8px; }
-        .status-text { font-size: 12px; color: #b9c6d8; white-space: nowrap; }
-        .status-text.ok { color: #4ade80; }
-        .status-text.err { color: #f87171; }
-        .act-btn {
-            border: 1px solid rgba(255,255,255,.25); background: transparent;
-            color: #e2e8f0; padding: 5px 10px; border-radius: 6px;
-            font-size: 12px; cursor: pointer; white-space: nowrap;
-        }
-        .act-btn:hover { background: rgba(255,255,255,.1); }
-        .act-btn:disabled { opacity: .6; cursor: default; }
-
-        /* 內容區（放 iframe） */
-        main { position: fixed; top: var(--top-h); left: 0; right: 0; bottom: 0; }
-        .frame-wrap { position: absolute; inset: 0; display: none; }
-        .frame-wrap.active { display: block; }
-        .frame-wrap iframe { width: 100%; height: 100%; border: 0; display: block; }
-
-        /* 載入中遮罩 */
-        .loader {
-            position: absolute; inset: 0; display: flex;
-            flex-direction: column; align-items: center; justify-content: center;
-            background: #f0f2f5; color: #64748b; font-size: 14px; gap: 10px; z-index: 5;
-        }
-        .spinner {
-            width: 30px; height: 30px; border-radius: 50%;
-            border: 3px solid #cbd5e1; border-top-color: var(--accent);
-            animation: spin .8s linear infinite;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-
-        @media (max-width: 640px) {
-            .brand small { display: none; }
-            .status-text { max-width: 110px; overflow: hidden; text-overflow: ellipsis; }
-        }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#090D16" id="metaThemeColor">
+    <title>LexiVault — 個人英語視覺詞庫與單字工坊</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%236366F1'/%3E%3Cstop offset='100%25' stop-color='%2306B6D4'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='16' fill='url(%23g)'/%3E%3Cpath d='M19 18h10v22h16v8H19z' fill='%23fff'/%3E%3Ccircle cx='43' cy='23' r='5' fill='%2310B981'/%3E%3C/svg%3E">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./css/tokens.css">
+    <link rel="stylesheet" href="./css/layout.css">
+    <link rel="stylesheet" href="./css/gallery.css">
+    <link rel="stylesheet" href="./css/deck.css">
+    <link rel="stylesheet" href="./css/arena.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://code.responsivevoice.org/responsivevoice.js?key=C065BhbX" defer></script>
 </head>
 <body>
-    <header class="top-bar">
-        <div class="brand">學習工具<small>兩個工具整合入口</small></div>
-        <nav class="tabs">
-            <button id="tabImage" class="tab active">🖼️ 圖片搜尋</button>
-            <button id="tabSentence" class="tab">📚 單字卡</button>
+    <div class="ambient-mesh" aria-hidden="true"></div>
+
+    <header class="topbar" role="banner">
+        <div class="topbar-left">
+            <a href="#gallery" class="brand" id="brandHomeBtn" title="LexiVault Studio">
+                <span class="brand-logo" aria-hidden="true">
+                    <svg viewBox="0 0 36 36" width="28" height="28">
+                        <defs>
+                            <linearGradient id="lvBrandGrad" x1="0" y1="0" x2="1" y2="1">
+                                <stop offset="0%" stop-color="#6366F1"/>
+                                <stop offset="100%" stop-color="#06B6D4"/>
+                            </linearGradient>
+                        </defs>
+                        <rect width="36" height="36" rx="10" fill="url(#lvBrandGrad)"/>
+                        <path d="M10.5 10h5.5v12.5h9.5v4.5h-15z" fill="#fff"/>
+                        <circle cx="24.5" cy="12.5" r="3" fill="#10B981"/>
+                    </svg>
+                </span>
+                <span class="brand-text">
+                    <strong>LexiVault</strong>
+                    <small>視覺詞庫 · 單字工坊</small>
+                </span>
+            </a>
+        </div>
+
+        <nav class="main-nav" aria-label="主要功能頁籤">
+            <button type="button" class="nav-pill active" data-tab="gallery" id="navTabGallery">
+                <span class="nav-icon" aria-hidden="true">🖼️</span>
+                <span class="nav-label">圖卡工坊</span>
+                <span class="nav-badge" id="badgeGalleryCount">—</span>
+            </button>
+            <button type="button" class="nav-pill" data-tab="deck" id="navTabDeck">
+                <span class="nav-icon" aria-hidden="true">📚</span>
+                <span class="nav-label">單字長句</span>
+                <span class="nav-badge" id="badgeDeckCount">—</span>
+            </button>
+            <button type="button" class="nav-pill" data-tab="arena" id="navTabArena">
+                <span class="nav-icon" aria-hidden="true">🎯</span>
+                <span class="nav-label">互動測驗</span>
+            </button>
+            <button type="button" class="nav-pill" data-tab="dashboard" id="navTabDashboard">
+                <span class="nav-icon" aria-hidden="true">📊</span>
+                <span class="nav-label">學習洞察</span>
+            </button>
         </nav>
-        <div class="status">
-            <span id="actStatus" class="status-text">啟動中…</span>
-            <button id="actNowBtn" class="act-btn" title="立即用輕量封包啟動兩個 Supabase 帳號">保持啟動</button>
+
+        <div class="topbar-right">
+            <button type="button" class="cmd-trigger" id="openCmdPaletteBtn" title="全域快速搜尋 (Ctrl+K)">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>
+                </svg>
+                <span class="cmd-trigger-text">搜尋全部…</span>
+                <kbd>Ctrl K</kbd>
+            </button>
+
+            <button type="button" class="cloud-pill" id="cloudHealthBtn" title="查看 Supabase 雙庫連線與保活狀態">
+                <span class="cloud-dot" id="cloudStatusDot"></span>
+                <span class="cloud-label" id="cloudStatusText">連線中</span>
+            </button>
+
+            <button type="button" class="icon-btn" id="themeToggleBtn" title="切換深色 / 淺色主題" aria-label="切換主題">
+                <svg class="icon-sun" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32 1.41-1.41"/>
+                </svg>
+                <svg class="icon-moon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                </svg>
+            </button>
+
+            <button type="button" class="icon-btn" id="openSettingsBtn" title="系統設定與備份" aria-label="設定">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+            </button>
         </div>
     </header>
 
-    <main>
-        <div class="frame-wrap active" id="wrapImage">
-            <div class="loader" id="loaderImage"><div class="spinner"></div><div>載入中…</div></div>
-            <iframe id="frameImage" title="圖片搜尋與單詞卡"></iframe>
-        </div>
-        <div class="frame-wrap" id="wrapSentence">
-            <div class="loader" id="loaderSentence"><div class="spinner"></div><div>載入中…</div></div>
-            <iframe id="frameSentence" title="單字卡學習"></iframe>
-        </div>
+    <main id="appMain" class="app-main">
+        <section id="view-gallery" class="app-view active" aria-labelledby="navTabGallery"></section>
+        <section id="view-deck" class="app-view" aria-labelledby="navTabDeck" hidden></section>
+        <section id="view-arena" class="app-view" aria-labelledby="navTabArena" hidden></section>
+        <section id="view-dashboard" class="app-view" aria-labelledby="navTabDashboard" hidden></section>
     </main>
 
-    <script>
-    // ============================================================
-    // 這份整合頁面「不改動」底下兩個工具各自的 API 設定。
-    // 這裡只記錄了兩組 Supabase 專案資訊，用來在開啟頁面時，
-    // 以「極輕量封包」各自打一次資料庫查詢，讓免費版帳號一週內保持活躍、不被暫停。
-    // ============================================================
-    var APPS = [
-        {
-            id: 'Image',
-            tabId: 'tabImage',
-            wrapId: 'wrapImage',
-            frameId: 'frameImage',
-            loaderId: 'loaderImage',
-            src: 'Image-Match-Game-main/index.html',
-            label: '圖片搜尋',
-            // Supabase 專案設定（維持原樣，不更動）
-            supabaseUrl: 'https://lnuguottscfwsmthmrkv.supabase.co',
-            supabaseKey: 'sb_publishable_kywRcUbkTQza7NwH8N4_Fg_oE0h4tSj',
-            pingTable: 'flashcard_explanations'
-        },
-        {
-            id: 'Sentence',
-            tabId: 'tabSentence',
-            wrapId: 'wrapSentence',
-            frameId: 'frameSentence',
-            loaderId: 'loaderSentence',
-            src: 'SentenceGame-main/index.html',
-            label: '單字卡',
-            // Supabase 專案設定（維持原樣，不更動）
-            supabaseUrl: 'https://fsqjuteaoprcrdsphqpt.supabase.co',
-            supabaseKey: 'sb_publishable_DIcf1pkMLybWGtAafbLABw_FZ4GQEs8',
-            pingTable: 'user_cards'
-        }
-    ];
+    <nav class="mobile-nav" aria-label="行動裝置導覽">
+        <button type="button" class="mobile-nav-btn active" data-tab="gallery">
+            <span class="m-icon">🖼️</span>
+            <span class="m-label">圖卡工坊</span>
+        </button>
+        <button type="button" class="mobile-nav-btn" data-tab="deck">
+            <span class="m-icon">📚</span>
+            <span class="m-label">單字長句</span>
+        </button>
+        <button type="button" class="mobile-nav-btn" data-tab="arena">
+            <span class="m-icon">🎯</span>
+            <span class="m-label">互動測驗</span>
+        </button>
+        <button type="button" class="mobile-nav-btn" data-tab="dashboard">
+            <span class="m-icon">📊</span>
+            <span class="m-label">學習洞察</span>
+        </button>
+    </nav>
 
-    // 每 6 天才需要啟動一次（配合 Supabase 免費版「7 天沒活動就會暫停」）
-    var ACTIVATE_INTERVAL_MS = 6 * 24 * 60 * 60 * 1000;
-    var LAST_ACTIVATE_KEY = 'integrated_learn_tools_last_activate';
+    <div id="audioDock" class="audio-dock" hidden aria-live="polite"></div>
+    <div id="commandPalette" class="cmd-overlay" hidden></div>
+    <div id="modalRoot" class="modal-root"></div>
+    <div id="toastContainer" class="toast-container" aria-live="polite"></div>
 
-    function nowMs() { return Date.now(); }
-
-    // 對單一 Supabase 專案送出「極輕量」的讀取封包（選取 1 列、僅 id 欄位 → 回應極小）
-    // 這會被算作真實資料庫活動，足以讓免費專案保持活躍、不被暫停。
-    async function pingProject(app) {
-        var url = app.supabaseUrl.replace(/\/+$/, '') + '/rest/v1/' + app.pingTable +
-                  '?select=id&limit=1';
-        var res = await fetch(url, {
-            method: 'GET',
-            headers: {
-                'apikey': app.supabaseKey,
-                'Authorization': 'Bearer ' + app.supabaseKey,
-                'Accept': 'application/json'
-            },
-            cache: 'no-store'
-        });
-        if (!res.ok) {
-            throw new Error(app.label + ' 啟動失敗 (HTTP ' + res.status + ')');
-        }
-        // 讀取完畢再結束（即便回應很小）
-        await res.text();
-    }
-
-    var _activating = false;
-    async function activateAll(force) {
-        if (_activating) return;
-        _activating = true;
-        var btn = document.getElementById('actNowBtn');
-        var st = document.getElementById('actStatus');
-        if (btn) btn.disabled = true;
-
-        try {
-            var lastRaw = localStorage.getItem(LAST_ACTIVATE_KEY);
-            var last = lastRaw ? parseInt(lastRaw, 10) : 0;
-            if (!force && last && (nowMs() - last) < ACTIVATE_INTERVAL_MS) {
-                // 6 天內才啟動過，不需要再啟動
-                var remain = ACTIVATE_INTERVAL_MS - (nowMs() - last);
-                st.textContent = '已保持啟動（約 ' + Math.ceil(remain / (24 * 3600 * 1000)) + ' 天後再自動啟動）';
-                st.className = 'status-text ok';
-                if (btn) btn.disabled = false;
-                return;
-            }
-
-            st.textContent = '正在啟動兩個帳號…';
-            st.className = 'status-text';
-
-            var results = await Promise.allSettled(APPS.map(function (app) {
-                return pingProject(app);
-            }));
-
-            var allOk = results.every(function (r) { return r.status === 'fulfilled'; });
-            localStorage.setItem(LAST_ACTIVATE_KEY, String(nowMs()));
-
-            if (allOk) {
-                st.textContent = '✅ 兩個 Supabase 帳號已啟動，6 天內將保持活躍';
-                st.className = 'status-text ok';
-            } else {
-                var fail = results.map(function (r, i) {
-                    return r.status === 'rejected' ? APPS[i].label + '(' + (r.reason && r.reason.message || '未知錯誤') + ')' : null;
-                }).filter(Boolean).join('、');
-                st.textContent = '⚠️ 部分啟動失敗：' + fail;
-                st.className = 'status-text err';
-            }
-        } catch (e) {
-            st.textContent = '⚠️ 啟動程序發生錯誤：' + (e && e.message || e);
-            st.className = 'status-text err';
-        } finally {
-            _activating = false;
-            if (btn) btn.disabled = false;
-        }
-    }
-// ------------------------------------------------------------------
-    // 頁籤切換（延遲載入 iframe，切換時才載入目標工具，保持輕量）
-    // ------------------------------------------------------------------
-    var ACTIVE_TAB_KEY = 'integrated_learn_tools_active';
-
-    function loadFrame(app) {
-        var iframe = document.getElementById(app.frameId);
-        if (!iframe.getAttribute('src')) {
-            iframe.setAttribute('src', app.src);
-            // iframe 載入完成後隱藏該工具自己的載入遮罩
-            iframe.addEventListener('load', function () {
-                var loader = document.getElementById(app.loaderId);
-                if (loader) loader.style.display = 'none';
-            });
-        }
-    }
-
-    function switchTab(app) {
-        APPS.forEach(function (a) {
-            document.getElementById(a.wrapId).classList.toggle('active', a.id === app.id);
-            document.getElementById(a.tabId).classList.toggle('active', a.id === app.id);
-        });
-        loadFrame(app);
-        try { localStorage.setItem(ACTIVE_TAB_KEY, app.id); } catch (e) {}
-    }
-
-    function bindTabs() {
-        APPS.forEach(function (app) {
-            document.getElementById(app.tabId).addEventListener('click', function () {
-                switchTab(app);
-            });
-        });
-        var btn = document.getElementById('actNowBtn');
-        if (btn) btn.addEventListener('click', function () { activateAll(true); });
-    }
-
-    // ------------------------------------------------------------------
-    // 啟動
-    // ------------------------------------------------------------------
-    document.addEventListener('DOMContentLoaded', function () {
-        bindTabs();
-        // 恢復上次使用的頁籤
-        var saved = null;
-        try { saved = localStorage.getItem(ACTIVE_TAB_KEY); } catch (e) {}
-        var initial = APPS.find(function (a) { return a.id === saved; }) || APPS[0];
-        // 預設載入該頁籤，並開始自動啟動兩個帳號
-        switchTab(initial);
-        activateAll(false);
-    });
-    </script>
+    <script type="module" src="./js/app.js"></script>
 </body>
 </html>
