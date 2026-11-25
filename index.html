@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#090D16" id="metaThemeColor">
+    <title>LexiVault — 個人英語視覺詞庫與單字工坊</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%236366F1'/%3E%3Cstop offset='100%25' stop-color='%2306B6D4'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='16' fill='url(%23g)'/%3E%3Cpath d='M19 18h10v22h16v8H19z' fill='%23fff'/%3E%3Ccircle cx='43' cy='23' r='5' fill='%2310B981'/%3E%3C/svg%3E">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./css/tokens.css">
+    <link rel="stylesheet" href="./css/layout.css">
+    <link rel="stylesheet" href="./css/gallery.css">
+    <link rel="stylesheet" href="./css/deck.css">
+    <link rel="stylesheet" href="./css/arena.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://code.responsivevoice.org/responsivevoice.js?key=C065BhbX" defer></script>
+</head>
+<body>
+    <div class="ambient-mesh" aria-hidden="true"></div>
+
+    <header class="topbar" role="banner">
+        <div class="topbar-left">
+            <a href="#gallery" class="brand" id="brandHomeBtn" title="LexiVault Studio">
+                <span class="brand-logo" aria-hidden="true">
+                    <svg viewBox="0 0 36 36" width="28" height="28">
+                        <defs>
+                            <linearGradient id="lvBrandGrad" x1="0" y1="0" x2="1" y2="1">
+                                <stop offset="0%" stop-color="#6366F1"/>
+                                <stop offset="100%" stop-color="#06B6D4"/>
+                            </linearGradient>
+                        </defs>
+                        <rect width="36" height="36" rx="10" fill="url(#lvBrandGrad)"/>
+                        <path d="M10.5 10h5.5v12.5h9.5v4.5h-15z" fill="#fff"/>
+                        <circle cx="24.5" cy="12.5" r="3" fill="#10B981"/>
+                    </svg>
+                </span>
+                <span class="brand-text">
+                    <strong>LexiVault</strong>
+                    <small>視覺詞庫 · 單字工坊</small>
+                </span>
+            </a>
+        </div>
+
+        <nav class="main-nav" aria-label="主要功能頁籤">
+            <button type="button" class="nav-pill active" data-tab="gallery" id="navTabGallery">
+                <span class="nav-icon" aria-hidden="true">🖼️</span>
+                <span class="nav-label">圖卡工坊</span>
+                <span class="nav-badge" id="badgeGalleryCount">—</span>
+            </button>
+            <button type="button" class="nav-pill" data-tab="deck" id="navTabDeck">
+                <span class="nav-icon" aria-hidden="true">📚</span>
+                <span class="nav-label">單字長句</span>
+                <span class="nav-badge" id="badgeDeckCount">—</span>
+            </button>
+            <button type="button" class="nav-pill" data-tab="arena" id="navTabArena">
+                <span class="nav-icon" aria-hidden="true">🎯</span>
+                <span class="nav-label">互動測驗</span>
+            </button>
+            <button type="button" class="nav-pill" data-tab="dashboard" id="navTabDashboard">
+                <span class="nav-icon" aria-hidden="true">📊</span>
+                <span class="nav-label">學習洞察</span>
+            </button>
+        </nav>
+
+        <div class="topbar-right">
+            <button type="button" class="cmd-trigger" id="openCmdPaletteBtn" title="全域快速搜尋 (Ctrl+K)">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>
+                </svg>
+                <span class="cmd-trigger-text">搜尋全部…</span>
+                <kbd>Ctrl K</kbd>
+            </button>
+
+            <button type="button" class="cloud-pill" id="cloudHealthBtn" title="查看 Supabase 雙庫連線與保活狀態">
+                <span class="cloud-dot" id="cloudStatusDot"></span>
+                <span class="cloud-label" id="cloudStatusText">連線中</span>
+            </button>
+
+            <button type="button" class="icon-btn" id="themeToggleBtn" title="切換深色 / 淺色主題" aria-label="切換主題">
+                <svg class="icon-sun" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32 1.41-1.41"/>
+                </svg>
+                <svg class="icon-moon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                </svg>
+            </button>
+
+            <button type="button" class="icon-btn" id="openSettingsBtn" title="系統設定與備份" aria-label="設定">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <main id="appMain" class="app-main">
+        <section id="view-gallery" class="app-view active" aria-labelledby="navTabGallery"></section>
+        <section id="view-deck" class="app-view" aria-labelledby="navTabDeck" hidden></section>
+        <section id="view-arena" class="app-view" aria-labelledby="navTabArena" hidden></section>
+        <section id="view-dashboard" class="app-view" aria-labelledby="navTabDashboard" hidden></section>
+    </main>
+
+    <nav class="mobile-nav" aria-label="行動裝置導覽">
+        <button type="button" class="mobile-nav-btn active" data-tab="gallery">
+            <span class="m-icon">🖼️</span>
+            <span class="m-label">圖卡工坊</span>
+        </button>
+        <button type="button" class="mobile-nav-btn" data-tab="deck">
+            <span class="m-icon">📚</span>
+            <span class="m-label">單字長句</span>
+        </button>
+        <button type="button" class="mobile-nav-btn" data-tab="arena">
+            <span class="m-icon">🎯</span>
+            <span class="m-label">互動測驗</span>
+        </button>
+        <button type="button" class="mobile-nav-btn" data-tab="dashboard">
+            <span class="m-icon">📊</span>
+            <span class="m-label">學習洞察</span>
+        </button>
+    </nav>
+
+    <div id="audioDock" class="audio-dock" hidden aria-live="polite"></div>
+    <div id="commandPalette" class="cmd-overlay" hidden></div>
+    <div id="modalRoot" class="modal-root"></div>
+    <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+
+    <script type="module" src="./js/app.js"></script>
+</body>
+</html>
